@@ -27,42 +27,61 @@ export class AdminController {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [userCount, pendingDeps, pendingWiths, todaySales, todayWithdrawals] =
-      await Promise.all([
-        this.prisma.user.count(),
-        this.prisma.deposit.findMany({
-          where: { status: 'PENDING' },
-          include: { user: true },
-        }),
-        this.prisma.withdraw.findMany({
-          where: { status: 'PENDING' },
-          include: { user: true },
-        }),
+    const [
+      userCount,
+      pendingDeps,
+      pendingWiths,
+      todayPurchases,
+      todayWithdrawals,
+      todayApprovedDeposits, // ထပ်တိုး- အတည်ပြုပြီးသား ငွေဖြည့်သွင်းမှုများ
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.deposit.findMany({
+        where: { status: 'PENDING' },
+        include: { user: true },
+      }),
+      this.prisma.withdraw.findMany({
+        where: { status: 'PENDING' },
+        include: { user: true },
+      }),
 
-        // ၁။ ဝင်ငွေ (အရောင်းရငွေ) တွက်ခြင်း
-        this.prisma.purchase.aggregate({
-          where: { createdAt: { gte: today } },
-          _sum: { amount: true },
-        }),
+      // ၁။ Product ဝယ်ယူမှုများ (အရောင်းရငွေ)
+      this.prisma.purchase.aggregate({
+        where: { createdAt: { gte: today } },
+        _sum: { amount: true },
+      }),
 
-        // ၂။ ထုတ်ယူငွေ (သို့မဟုတ် လျော်ကြေးပေးငွေ) တွက်ခြင်း
-        this.prisma.withdraw.aggregate({
-          where: { status: 'APPROVED', updatedAt: { gte: today } },
-          _sum: { amount: true },
-        }),
-      ]);
+      // ၂။ ထုတ်ယူငွေ (APPROVED ဖြစ်ပြီးသား)
+      this.prisma.withdraw.aggregate({
+        where: { status: 'APPROVED', updatedAt: { gte: today } },
+        _sum: { amount: true },
+      }),
 
-    const revenue = Number(todaySales._sum.amount || 0);
+      // 💡 ၃။ ငွေဖြည့်သွင်းမှု (APPROVED ဖြစ်ပြီးသား) - ဤအချက်က Income ဖြစ်စေသည်
+      this.prisma.deposit.aggregate({
+        where: { status: 'APPROVED', updatedAt: { gte: today } },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    // တွက်ချက်ခြင်း
+    const purchaseRevenue = Number(todayPurchases._sum.amount || 0);
+    const depositIncome = Number(todayApprovedDeposits._sum.amount || 0);
     const expense = Number(todayWithdrawals._sum.amount || 0);
-    const netProfit = revenue - expense; // 💡 အသားတင်အမြတ်
+
+    // 💡 စုစုပေါင်းဝင်ငွေ = အရောင်းရငွေ + ငွေဖြည့်သွင်းမှု
+    const totalRevenue = purchaseRevenue + depositIncome;
+    const netProfit = totalRevenue - expense;
 
     return {
       userCount,
       deposits: pendingDeps,
       withdrawals: pendingWiths,
-      todayRevenue: revenue,
+      todayRevenue: totalRevenue, // စုစုပေါင်းဝင်ငွေ
+      todayPurchase: purchaseRevenue, // အရောင်းသီးသန့်
+      todayDeposit: depositIncome, // ငွေဖြည့်သွင်းမှုသီးသန့်
       todayWithdraw: expense,
-      netProfit: netProfit, // 👈 ဤတန်ဖိုးကို ပို့ပေးလိုက်ပါပြီ
+      netProfit: netProfit,
     };
   }
   @Get('products')
