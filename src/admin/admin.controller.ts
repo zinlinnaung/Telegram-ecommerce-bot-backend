@@ -98,6 +98,49 @@ export class AdminController {
     });
   }
 
+  @Get('users/:id')
+  async getUserDetails(@Param('id', ParseIntPipe) id: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        // နောက်ဆုံး ငွေသွင်းမှု ၁၀ ကြိမ်
+        deposits: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        // နောက်ဆုံး ငွေထုတ်မှု ၁၀ ကြိမ်
+        withdraws: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+        // နောက်ဆုံး ထိုးသားမှု ၂၀ ကြိမ်
+        bets: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
+        // ဝယ်ယူမှုမှတ်တမ်းများ
+        purchases: {
+          include: { product: true },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+      },
+    });
+
+    if (!user) throw new BadRequestException('User not found');
+
+    // စုစုပေါင်း ငွေသွင်း/ငွေထုတ် ပမာဏများကို တွက်ချက်ခြင်း (Optional)
+    const totalDeposit = user.deposits
+      .filter((d) => d.status === 'APPROVED')
+      .reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+    const totalWithdraw = user.withdraws
+      .filter((w) => w.status === 'APPROVED')
+      .reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+    return { ...user, totalDeposit, totalWithdraw };
+  }
+
   @Get('get-image-url/:fileId')
   async getImageUrl(@Param('fileId') fileId: string) {
     try {
