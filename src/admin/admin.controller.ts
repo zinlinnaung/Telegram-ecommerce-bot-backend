@@ -6,6 +6,8 @@ import {
   ParseIntPipe,
   BadRequestException,
   Body,
+  Delete,
+  Put,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectBot } from 'nestjs-telegraf';
@@ -21,6 +23,80 @@ export class AdminController {
     @InjectBot() private readonly bot: Telegraf<BotContext>,
     private readonly withdrawService: WithdrawService,
   ) {}
+
+  @Post('products')
+  async createProduct(
+    @Body()
+    body: {
+      name: string;
+      category: string;
+      description?: string;
+      price: number;
+    },
+  ) {
+    return this.prisma.product.create({
+      data: {
+        name: body.name,
+        category: body.category,
+        description: body.description,
+        price: body.price,
+      },
+    });
+  }
+
+  // 2. Update Product
+  @Put('products/:id')
+  async updateProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    body: {
+      name?: string;
+      category?: string;
+      description?: string;
+      price?: number;
+    },
+  ) {
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        name: body.name,
+        category: body.category,
+        description: body.description,
+        price: body.price,
+      },
+    });
+  }
+
+  // 3. Delete Product
+  @Delete('products/:id')
+  async deleteProduct(@Param('id', ParseIntPipe) id: number) {
+    // Note: Foreign key constraint ရှိလျှင် Keys များကို အရင်ဖျက်ရပါမည်
+    // သို့သော် Prisma relation တွင် onDelete: Cascade မပါလျှင် manual ဖျက်ရမည်
+
+    // Linked Keys များကို အရင်ဖျက်ခြင်း
+    await this.prisma.productKey.deleteMany({
+      where: { productId: id },
+    });
+
+    return this.prisma.product.delete({
+      where: { id },
+    });
+  }
+
+  // 4. Add Keys (Inventory) to Product
+  @Post('products/:id/keys')
+  async addProductKey(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { key: string },
+  ) {
+    return this.prisma.productKey.create({
+      data: {
+        key: body.key,
+        productId: id,
+        isUsed: false,
+      },
+    });
+  }
 
   @Get('dashboard-stats')
   async getStats() {
