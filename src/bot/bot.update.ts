@@ -135,7 +135,7 @@ export class BotUpdate {
   async onHighLow(@Ctx() ctx: BotContext) {
     // Web App ရဲ့ URL (ဥပမာ - https://your-game-app.web.app/high-low)
     // .env ထဲမှာ WEB_APP_URL ဆိုပြီး သိမ်းထားတာ ပိုကောင်းပါတယ်
-    const webAppUrl = `https://your-game-app.web.app/high-low`;
+    const webAppUrl = `https://bot-admin-dashboard.vercel.app/game`;
 
     await ctx.reply(
       '🎲 <b>High/Low Game (အနိမ့်/အမြင့်)</b>\n\n' +
