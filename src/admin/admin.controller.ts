@@ -8,6 +8,7 @@ import {
   Body,
   Delete,
   Put,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectBot } from 'nestjs-telegraf';
@@ -182,6 +183,36 @@ export class AdminController {
       create: { key: 'isTopUpOpen', value: body.status.toString() },
     });
     return { success: true, status: body.status };
+  }
+
+  @Get('by-telegram/:tid')
+  async getUserByTelegramId(@Param('tid') tid: string) {
+    try {
+      const user = await this.prisma.user.findFirst({
+        where: {
+          // 💡 String ကို BigInt အဖြစ် ပြောင်းလဲပေးခြင်း
+          telegramId: BigInt(tid),
+        },
+        include: {
+          deposits: true,
+          withdraws: true,
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException(`User with Telegram ID ${tid} not found`);
+      }
+
+      // 💡 BigInt ပါတဲ့ Object ကို JSON အဖြစ် ပြန်ပို့တဲ့အခါ Error မတက်အောင်
+      // balance သို့မဟုတ် telegramId ကို String ပြောင်းပေးဖို့ လိုနိုင်ပါတယ်
+      return {
+        ...user,
+        telegramId: user.telegramId.toString(),
+        balance: user.balance.toString(), // Balance ကလည်း BigInt ဖြစ်နေတတ်လို့ပါ
+      };
+    } catch (error) {
+      throw new BadRequestException('Invalid Telegram ID format');
+    }
   }
 
   @Get('users/:id')
