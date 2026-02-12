@@ -3,6 +3,7 @@ import { Scenes, Markup } from 'telegraf';
 import { WalletService } from '../../wallet/wallet.service';
 import { UsersService } from '../../users/users.service';
 import { MAIN_KEYBOARD } from '../bot.update'; // Ensure MAIN_KEYBOARD is exported from bot.update
+import { PrismaService } from 'src/prisma/prisma.service';
 
 interface WizardContext extends Scenes.WizardContext {
   wizard: {
@@ -18,6 +19,7 @@ export class TopUpScene {
   constructor(
     private walletService: WalletService,
     private userService: UsersService,
+    private readonly prisma: PrismaService,
   ) {}
 
   // ============================================================
@@ -25,6 +27,23 @@ export class TopUpScene {
   // ============================================================
   @WizardStep(1)
   async askAmount(@Context() ctx: WizardContext) {
+    // 1. Setting ကို Database ထဲက အရင်ရှာမယ်
+    const setting = await this.prisma.systemSetting.findUnique({
+      where: { key: 'isTopUpOpen' },
+    });
+
+    // 2. ပိတ်ထားရင် (value က 'false' ဖြစ်နေရင်) အသိပေးစာပို့ပြီး ထွက်မယ်
+    if (setting && setting.value === 'false') {
+      await ctx.reply(
+        '⚠️ <b>ခေတ္တပိတ်ထားပါသည်။</b>\n\n' +
+          'လက်ရှိတွင် ငွေဖြည့်သွင်းခြင်း (Top-Up) ကို ခေတ္တပိတ်ထားပါသည်ခင်ဗျာ။\n' +
+          'ခေတ္တစောင့်ဆိုင်းပေးပါရန် မေတ္တာရပ်ခံအပ်ပါသည်။ 🙏',
+        { parse_mode: 'HTML', ...MAIN_KEYBOARD },
+      );
+      return ctx.scene.leave();
+    }
+
+    // 3. ဖွင့်ထားရင် ပုံမှန်အတိုင်း ဆက်သွားမယ်
     await ctx.reply(
       '💰 <b>ငွေဖြည့်သွင်းခြင်း (Top-Up)</b>\n\n' +
         'ငွေဖြည့်သွင်းလိုသည့် ပမာဏကို ရိုက်ထည့်ပေးပါခင်ဗျာ။\n' +
@@ -35,7 +54,7 @@ export class TopUpScene {
         ...Markup.keyboard([['❌ မလုပ်တော့ပါ']]).resize(),
       },
     );
-    ctx.wizard.next(); // return context logic error ကို ရှောင်ရန် return မသုံးပါ
+    ctx.wizard.next();
   }
 
   // ============================================================

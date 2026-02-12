@@ -174,6 +174,16 @@ export class AdminController {
     });
   }
 
+  @Post('toggle-topup')
+  async toggleTopUp(@Body() body: { status: boolean }) {
+    await this.prisma.systemSetting.upsert({
+      where: { key: 'isTopUpOpen' },
+      update: { value: body.status.toString() },
+      create: { key: 'isTopUpOpen', value: body.status.toString() },
+    });
+    return { success: true, status: body.status };
+  }
+
   @Get('users/:id')
   async getUserDetails(@Param('id', ParseIntPipe) id: number) {
     const user = await this.prisma.user.findUnique({
