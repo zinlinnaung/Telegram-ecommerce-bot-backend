@@ -139,10 +139,20 @@ export class TopUpScene {
       );
 
       // Admin ထံ Notification ပို့ခြင်း
-      const adminId = process.env.ADMIN_ID;
-      if (adminId) {
-        await ctx.telegram.sendPhoto(adminId, fileId, {
-          caption: `🔔 <b>New Deposit Request</b>\n👤 User: ${ctx.from.first_name}\n💰 Amount: ${amount.toLocaleString()} MMK`,
+      // const adminId = process.env.ADMIN_ID;
+
+      const channelId = process.env.ADMIN_CHANNEL_ID;
+
+      if (channelId) {
+        await ctx.telegram.sendPhoto(channelId, fileId, {
+          caption:
+            `🔔 <b>New Deposit Request</b>\n` +
+            `➖➖➖➖➖➖➖➖➖➖\n` +
+            `👤 User: <b>${ctx.from.first_name}</b>\n` +
+            `🆔 ID: <code>${userId}</code>\n` +
+            `💰 Amount: <b>${amount.toLocaleString()} MMK</b>\n` +
+            `📅 Date: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Yangon' })}\n` +
+            `#Deposit_${deposit.id}`,
           parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
@@ -151,8 +161,6 @@ export class TopUpScene {
                   text: '✅ Approve',
                   callback_data: `approve_deposit_${deposit.id}`,
                 },
-              ],
-              [
                 {
                   text: '❌ Reject',
                   callback_data: `reject_deposit_${deposit.id}`,
@@ -162,6 +170,29 @@ export class TopUpScene {
           },
         });
       }
+
+      // if (adminId) {
+      //   await ctx.telegram.sendPhoto(adminId, fileId, {
+      //     caption: `🔔 <b>New Deposit Request</b>\n👤 User: ${ctx.from.first_name}\n💰 Amount: ${amount.toLocaleString()} MMK`,
+      //     parse_mode: 'HTML',
+      //     reply_markup: {
+      //       inline_keyboard: [
+      //         [
+      //           {
+      //             text: '✅ Approve',
+      //             callback_data: `approve_deposit_${deposit.id}`,
+      //           },
+      //         ],
+      //         [
+      //           {
+      //             text: '❌ Reject',
+      //             callback_data: `reject_deposit_${deposit.id}`,
+      //           },
+      //         ],
+      //       ],
+      //     },
+      //   });
+      // }
 
       await ctx.telegram
         .deleteMessage(ctx.chat.id, loadingMsg.message_id)
