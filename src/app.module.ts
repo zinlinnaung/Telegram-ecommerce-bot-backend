@@ -16,6 +16,7 @@ import { WithdrawService } from './wallet/withdraw.service';
     PrismaModule,
     LotteryModule,
     TelegrafModule.forRootAsync({
+      imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const token = configService.get<string>('BOT_TOKEN');
         const url = configService.get<string>('WEBHOOK_URL');
