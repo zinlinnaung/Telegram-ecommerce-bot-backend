@@ -187,32 +187,22 @@ export class AdminController {
 
   @Get('by-telegram/:tid')
   async getUserByTelegramId(@Param('tid') tid: string) {
-    try {
-      const user = await this.prisma.user.findFirst({
-        where: {
-          // 💡 String ကို BigInt အဖြစ် ပြောင်းလဲပေးခြင်း
-          telegramId: BigInt(tid),
-        },
-        include: {
-          deposits: true,
-          withdraws: true,
-        },
-      });
+    const user = await this.prisma.user.findFirst({
+      where: {
+        telegramId: BigInt(tid), // BigInt ပြောင်းပြီးရှာမယ်
+      },
+    });
 
-      if (!user) {
-        throw new NotFoundException(`User with Telegram ID ${tid} not found`);
-      }
-
-      // 💡 BigInt ပါတဲ့ Object ကို JSON အဖြစ် ပြန်ပို့တဲ့အခါ Error မတက်အောင်
-      // balance သို့မဟုတ် telegramId ကို String ပြောင်းပေးဖို့ လိုနိုင်ပါတယ်
-      return {
-        ...user,
-        telegramId: user.telegramId.toString(),
-        balance: user.balance.toString(), // Balance ကလည်း BigInt ဖြစ်နေတတ်လို့ပါ
-      };
-    } catch (error) {
-      throw new BadRequestException('Invalid Telegram ID format');
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
+
+    // 💡 အရေးကြီးသည်: Decimal နှင့် BigInt ကို JSON ပို့ရန် String ပြောင်းပေးရမည်
+    return {
+      ...user,
+      telegramId: user.telegramId.toString(),
+      balance: user.balance.toString(),
+    };
   }
 
   @Get('users/:id')
