@@ -153,6 +153,35 @@ export class BotUpdate {
     );
   }
 
+  // BotUpdate class ရဲ့ အောက်နားတစ်နေရာမှာ ထည့်ပါ
+  @Action('go_main')
+  async onGoMainAction(@Ctx() ctx: BotContext) {
+    // ၁။ လက်ရှိ Inline Keyboard ပါတဲ့ message ကို ဖျက်လိုက်မယ် (Optionally)
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {
+      // message ဖျက်မရရင် ignore လုပ်မယ်
+    }
+
+    // ၂။ ပင်မစာမျက်နှာကို ပြန်ပို့မယ် (onHome function ကို ပြန်ခေါ်သလိုမျိုး)
+    const user = await this.usersService.findOrCreateUser(
+      Number(ctx.from.id),
+      ctx.from.first_name,
+      ctx.from.username,
+    );
+
+    await ctx.reply(
+      `🏠 <b>ပင်မစာမျက်နှာသို့ ပြန်ရောက်ပါပြီ။</b>\n\n💰 လက်ရှိလက်ကျန်ငွေ: <b>${user.balance} MMK</b>`,
+      {
+        parse_mode: 'HTML',
+        ...MAIN_KEYBOARD,
+      },
+    );
+
+    // ၃။ Loading icon လေး ပျောက်သွားအောင် answer ပေးရပါမယ်
+    await ctx.answerCbQuery();
+  }
+
   // src/bot/bot.update.ts
 
   @Hears('📝 ထိုးမှတ်တမ်း')
