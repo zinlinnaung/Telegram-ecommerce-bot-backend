@@ -511,22 +511,22 @@ export class AdminController {
     });
 
     // --- 💡 Telegram သို့ Notification ပို့ခြင်း (Sync ဖြစ်စေရန်) ---
-    const resultEmoji = isWin ? '🎉' : '😢';
-    const statusText = isWin ? `နိုင်ပါတယ် (Winner)` : `ရှုံးပါတယ် (Loser)`;
+    // const resultEmoji = isWin ? '🎉' : '😢';
+    // const statusText = isWin ? `နိုင်ပါတယ် (Winner)` : `ရှုံးပါတယ် (Loser)`;
 
-    try {
-      await this.bot.telegram.sendMessage(
-        Number(telegramId),
-        `${resultEmoji} <b>High/Low Result</b>\n\n` +
-          `ဂဏန်း: <b>${resultNum}</b> (${resultNum >= 50 ? 'HIGH' : 'LOW'})\n` +
-          `ရလဒ်: <b>${statusText}</b>\n` +
-          `ပမာဏ: <b>${isWin ? '+' : '-'}${isWin ? payout : amount} MMK</b>\n\n` +
-          `💰 လက်ကျန်ငွေ: <b>${Number(updatedUser.balance).toLocaleString()} MMK</b>`,
-        { parse_mode: 'HTML' },
-      );
-    } catch (e) {
-      console.error('Failed to send TG message:', e);
-    }
+    // try {
+    //   await this.bot.telegram.sendMessage(
+    //     Number(telegramId),
+    //     `${resultEmoji} <b>High/Low Result</b>\n\n` +
+    //       `ဂဏန်း: <b>${resultNum}</b> (${resultNum >= 50 ? 'HIGH' : 'LOW'})\n` +
+    //       `ရလဒ်: <b>${statusText}</b>\n` +
+    //       `ပမာဏ: <b>${isWin ? '+' : '-'}${isWin ? payout : amount} MMK</b>\n\n` +
+    //       `💰 လက်ကျန်ငွေ: <b>${Number(updatedUser.balance).toLocaleString()} MMK</b>`,
+    //     { parse_mode: 'HTML' },
+    //   );
+    // } catch (e) {
+    //   console.error('Failed to send TG message:', e);
+    // }
 
     return {
       resultNum,
