@@ -18,7 +18,7 @@ export class WithdrawScene {
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
     await ctx.reply(
-      '💸 <b>ငွေထုတ်ယူခြင်း</b>\n\nထုတ်ယူလိုသော ပမာဏကို ရိုက်ထည့်ပါ (အနည်းဆုံး ၅၀၀၀ ကျပ်)',
+      '💸 <b>ငွေထုတ်ယူခြင်း</b>\n\nထုတ်ယူလိုသော ပမာဏကို ရိုက်ထည့်ပါ (အနည်းဆုံး 10000 ကျပ်)',
       { parse_mode: 'HTML', ...Markup.keyboard([['❌ ပယ်ဖျက်မည်']]).resize() },
     );
   }
@@ -40,8 +40,8 @@ export class WithdrawScene {
         where: { telegramId: BigInt(ctx.from.id) },
       });
 
-      if (isNaN(amount) || amount < 5000)
-        return ctx.reply('❌ အနည်းဆုံး ၅၀၀၀ ကျပ် ဖြစ်ရပါမယ်။');
+      if (isNaN(amount) || amount < 10000)
+        return ctx.reply('❌ အနည်းဆုံး 10,000 ကျပ် ဖြစ်ရပါမယ်။');
       if (!user || Number(user.balance) < amount)
         return ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
 

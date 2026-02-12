@@ -426,4 +426,97 @@ export class AdminController {
       message: `${type} Result (${winNumber}) ထုတ်ပြန်ပြီးပါပြီ။`,
     };
   }
+
+  @Post('high-low/play')
+  async play(
+    @Body()
+    body: {
+      telegramId: string;
+      amount: number;
+      choice: 'HIGH' | 'LOW';
+    },
+  ) {
+    const { telegramId, amount, choice } = body;
+    const tid = BigInt(telegramId);
+
+    const user = await this.prisma.user.findUnique({
+      where: { telegramId: tid },
+    });
+
+    if (!user || Number(user.balance) < amount)
+      throw new BadRequestException('Insufficient balance');
+
+    // --- Win/Lose Logic ---
+    const settings = await this.getSettings();
+    const winRatio = parseInt(settings['winRatio'] || '40');
+    const multiplier = parseFloat(settings['payoutMultiplier'] || '1.8');
+
+    const isWin = Math.floor(Math.random() * 100) < winRatio;
+    const resultNum = isWin
+      ? choice === 'HIGH'
+        ? Math.floor(Math.random() * 50) + 50
+        : Math.floor(Math.random() * 50)
+      : choice === 'HIGH'
+        ? Math.floor(Math.random() * 50)
+        : Math.floor(Math.random() * 50) + 50;
+
+    const payout = isWin ? amount * multiplier : 0;
+
+    // --- DB Transaction ---
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: amount } },
+      });
+
+      const bet = await tx.highLowBet.create({
+        data: {
+          userId: user.id,
+          amount,
+          choice,
+          resultNum,
+          status: isWin ? 'WIN' : 'LOSE',
+          payout,
+        },
+      });
+
+      if (isWin) {
+        return await tx.user.update({
+          where: { id: user.id },
+          data: { balance: { increment: payout } },
+        });
+      }
+      return await tx.user.findUnique({ where: { id: user.id } });
+    });
+
+    // --- 💡 Telegram သို့ Notification ပို့ခြင်း (Sync ဖြစ်စေရန်) ---
+    const resultEmoji = isWin ? '🎉' : '😢';
+    const statusText = isWin ? `နိုင်ပါတယ် (Winner)` : `ရှုံးပါတယ် (Loser)`;
+
+    try {
+      await this.bot.telegram.sendMessage(
+        Number(telegramId),
+        `${resultEmoji} <b>High/Low Result</b>\n\n` +
+          `ဂဏန်း: <b>${resultNum}</b> (${resultNum >= 50 ? 'HIGH' : 'LOW'})\n` +
+          `ရလဒ်: <b>${statusText}</b>\n` +
+          `ပမာဏ: <b>${isWin ? '+' : '-'}${isWin ? payout : amount} MMK</b>\n\n` +
+          `💰 လက်ကျန်ငွေ: <b>${Number(updatedUser.balance).toLocaleString()} MMK</b>`,
+        { parse_mode: 'HTML' },
+      );
+    } catch (e) {
+      console.error('Failed to send TG message:', e);
+    }
+
+    return {
+      resultNum,
+      isWin,
+      payout,
+      newBalance: Number(updatedUser.balance),
+    };
+  }
+
+  // private async getSettings() {
+  //   const settings = await this.prisma.systemSetting.findMany();
+  //   return settings.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
+  // }
 }

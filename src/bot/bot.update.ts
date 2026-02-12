@@ -133,7 +133,24 @@ export class BotUpdate {
 
   @Hears('🎲 အနိမ့်/အမြင့်')
   async onHighLow(@Ctx() ctx: BotContext) {
-    await ctx.scene.enter('high_low_scene');
+    // Web App ရဲ့ URL (ဥပမာ - https://your-game-app.web.app/high-low)
+    // .env ထဲမှာ WEB_APP_URL ဆိုပြီး သိမ်းထားတာ ပိုကောင်းပါတယ်
+    const webAppUrl = `https://your-game-app.web.app/high-low`;
+
+    await ctx.reply(
+      '🎲 <b>High/Low Game (အနိမ့်/အမြင့်)</b>\n\n' +
+        'ကံစမ်းရန်အတွက် အောက်ပါ <b>Play Game</b> ခလုတ်ကို နှိပ်ပြီးကစားနိုင်ပါပြီခင်ဗျာ။',
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            // 💡 ဤနေရာတွင် Web App ခလုတ်ကို ထည့်သွင်းထားသည်
+            Markup.button.webApp('🎮 Play Game (ကစားမည်)', webAppUrl),
+          ],
+          [Markup.button.callback('🏠 ပင်မစာမျက်နှာ', 'go_main')],
+        ]),
+      },
+    );
   }
 
   // src/bot/bot.update.ts
