@@ -9,6 +9,7 @@ import {
   Delete,
   Put,
   NotFoundException,
+  Query,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectBot } from 'nestjs-telegraf';
@@ -303,6 +304,42 @@ export class AdminController {
   @Post('approve-deposit/:id')
   async approveDep(@Param('id', ParseIntPipe) id: number) {
     return await this.withdrawService.approveDeposit(id);
+  }
+
+  // admin.controller.ts ထဲသို့ ထည့်ရန်
+
+  @Get('transactions')
+  async getAllTransactions(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    const p = parseInt(page);
+    const l = parseInt(limit);
+    const skip = (p - 1) * l;
+
+    const [transactions, total] = await Promise.all([
+      this.prisma.transaction.findMany({
+        skip,
+        take: l,
+        orderBy: { createdAt: 'desc' },
+        include: { user: true },
+      }),
+      this.prisma.transaction.count(),
+    ]);
+
+    return {
+      data: transactions.map((t) => ({
+        ...t,
+        amount: t.amount.toString(),
+        telegramId: t.user.telegramId.toString(),
+        username: t.user.username || t.user.firstName || 'Unknown',
+      })),
+      meta: {
+        total,
+        page: p,
+        lastPage: Math.ceil(total / l),
+      },
+    };
   }
 
   @Post('reject-deposit/:id')
