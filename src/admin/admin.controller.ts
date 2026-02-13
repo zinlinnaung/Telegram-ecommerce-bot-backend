@@ -569,6 +569,7 @@ export class AdminController {
       status: result.betRecord.status,
       payout: Number(result.betRecord.payout),
       newBalance: Number(result.finalUser.balance),
+      isWin: isWin, // <--- ဤ line ကို ဖြည့်စွက်ပေးရပါမည်
       message: isWin ? '🎉 You Win!' : '😞 You Lose!',
     };
   }
