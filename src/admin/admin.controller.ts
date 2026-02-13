@@ -16,7 +16,7 @@ import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
 import { BotContext } from 'src/interfaces/bot-context.interface';
 import { WithdrawService } from 'src/wallet/withdraw.service';
-import { WithdrawStatus } from '@prisma/client';
+import { TransactionType, WithdrawStatus } from '@prisma/client';
 
 @Controller('admin')
 export class AdminController {
@@ -471,6 +471,16 @@ export class AdminController {
               where: { id: bet.id },
               data: { status: 'WIN' },
             }),
+
+            // 💡 Transaction မှတ်တမ်းအသစ် ထည့်သွင်းခြင်း
+            this.prisma.transaction.create({
+              data: {
+                userId: userId,
+                amount: winAmount,
+                type: TransactionType.REFUND, // သို့မဟုတ် Enum မှာ အသစ်တိုးပြီး 'WIN_PAYOUT' သုံးပါ
+                description: `${type} (${targetSession}) ပေါက်ဂဏန်း ${winNumber} အတွက် အနိုင်ရငွေ`,
+              },
+            }),
             this.prisma.withdraw.create({
               data: {
                 userId: userId,
@@ -636,6 +646,16 @@ export class AdminController {
         data: { balance: { decrement: amount } },
       });
 
+      // 💡 ငွေနှုတ်ယူမှု Transaction မှတ်တမ်း
+      await tx.transaction.create({
+        data: {
+          userId: user.id,
+          amount: amount,
+          type: 'PURCHASE',
+          description: `High/Low ဂိမ်းလောင်းကြေး (${choice})`,
+        },
+      });
+
       // ၂။ Bet မှတ်တမ်းသွင်းမည်
       const betRecord = await tx.highLowBet.create({
         data: {
@@ -654,6 +674,16 @@ export class AdminController {
         finalUser = await tx.user.update({
           where: { id: user.id },
           data: { balance: { increment: payout } },
+        });
+
+        // 💡 အနိုင်ရငွေ Transaction မှတ်တမ်း
+        await tx.transaction.create({
+          data: {
+            userId: user.id,
+            amount: payout,
+            type: 'REFUND',
+            description: `High/Low ဂိမ်းအနိုင်ရငွေ (ဂဏန်း: ${resultNum})`,
+          },
         });
       } else {
         finalUser = await tx.user.findUnique({

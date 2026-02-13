@@ -106,6 +106,15 @@ export class WithdrawService {
         data: { status: DepositStatus.APPROVED },
         include: { user: true },
       }),
+
+      this.prisma.transaction.create({
+        data: {
+          userId: deposit.userId,
+          amount: deposit.amount,
+          type: 'DEPOSIT',
+          description: 'ငွေဖြည့်သွင်းမှု အောင်မြင်ပါသည်။',
+        },
+      }),
     ]);
 
     // User ဆီ Notification ပို့ခြင်း

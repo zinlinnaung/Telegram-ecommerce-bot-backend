@@ -104,6 +104,16 @@ export class WithdrawScene {
           data: { balance: { decrement: state.amount } },
         });
 
+        // 💡 ၂။ Transaction History Table ထဲသို့ မှတ်တမ်းသွင်းခြင်း
+        await tx.transaction.create({
+          data: {
+            userId: dbUser.id,
+            amount: state.amount,
+            type: 'PURCHASE', // သင့် Enum မှာ 'WITHDRAW' မရှိသေးရင် PURCHASE သို့မဟုတ် REFUND သုံးပါ
+            description: `ငွေထုတ်ယူရန် တောင်းဆိုမှု (${state.method})`,
+          },
+        });
+
         return await tx.withdraw.create({
           data: {
             userId: dbUser.id,

@@ -553,6 +553,15 @@ export class BotUpdate {
           where: { id: withdrawId },
           data: { status: 'REJECTED' },
         }),
+
+        this.prisma.transaction.create({
+          data: {
+            userId: withdraw.userId,
+            amount: withdraw.amount,
+            type: 'REFUND',
+            description: `ငွေထုတ်ယူမှု ပယ်ဖျက်ခြင်း (Refund) - #${withdrawId}`,
+          },
+        }),
       ]);
 
       // Admin UI Update
