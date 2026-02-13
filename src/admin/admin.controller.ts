@@ -357,86 +357,109 @@ export class AdminController {
   async settleResult(@Body() body: { type: '2D' | '3D'; winNumber: string }) {
     const { type, winNumber } = body;
 
-    // ၁။ လက်ရှိ မြန်မာစံတော်ချိန် Session ကို သတ်မှတ်ခြင်း
+    // ၁။ လက်ရှိ မြန်မာစံတော်ချိန် Session သတ်မှတ်ခြင်း
     const now = new Date();
     const mmTime = new Date(
       now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }),
     );
     const session = mmTime.getHours() < 13 ? 'MORNING' : 'EVENING';
 
-    // ၂။ ထိုးထားသမျှ PENDING ဖြစ်နေသော Bet များကို ရှာခြင်း
+    // ၂။ Bet များကို ရှာဖွေခြင်း
     const bets = await this.prisma.bet.findMany({
-      where: {
-        type,
-        session,
-        status: 'PENDING',
-      },
+      where: { type, session, status: 'PENDING' },
       include: { user: true },
     });
+
+    // 💡 User အလိုက် ရလဒ်များကို စုစည်းရန် Map တစ်ခု တည်ဆောက်ခြင်း
+    const userResults = new Map<
+      number,
+      {
+        telegramId: string;
+        winNumbers: string[];
+        loseNumbers: string[];
+        totalWinAmount: number;
+      }
+    >();
 
     let winCount = 0;
 
     for (const bet of bets) {
+      const userId = bet.userId;
+
+      // User ရဲ့ လက်ရှိ record ကို Map ထဲမှာ ရှာသည်၊ မရှိရင် အသစ်ဆောက်သည်
+      if (!userResults.has(userId)) {
+        userResults.set(userId, {
+          telegramId: bet.user.telegramId.toString(),
+          winNumbers: [],
+          loseNumbers: [],
+          totalWinAmount: 0,
+        });
+      }
+
+      const userData = userResults.get(userId);
+
       if (bet.number === winNumber) {
-        // ✅ ပေါက်သောသူများအတွက် တွက်ချက်ခြင်း
+        // ✅ ပေါက်သောကွက်များအတွက်
         const multiplier = type === '2D' ? 80 : 500;
         const winAmount = Number(bet.amount) * multiplier;
 
-        // ၃။ Database Transaction (Atomic Update)
         await this.prisma.$transaction([
-          // User Balance တိုးပေးခြင်း
           this.prisma.user.update({
-            where: { id: bet.userId },
+            where: { id: userId },
             data: { balance: { increment: winAmount } },
           }),
-          // Bet Status ကို WIN ပြောင်းခြင်း
           this.prisma.bet.update({
             where: { id: bet.id },
             data: { status: 'WIN' },
           }),
-          // Withdraw Table တွင် Payout အဖြစ် စာရင်းသွင်းခြင်း (Required Fields အားလုံးပါဝင်သည်)
           this.prisma.withdraw.create({
             data: {
-              user: {
-                connect: { id: bet.userId },
-              },
+              user: { connect: { id: userId } },
               amount: winAmount,
               status: 'APPROVED',
               method: 'WIN_PAYOUT',
-              phoneNumber: 'SYSTEM_PAYOUT', // Schema အရ လိုအပ်သောကြောင့် dummy ထည့်ပေးခြင်း
-              accountName: bet.user.username || 'WINNER', // User username သို့မဟုတ် Default name
+              phoneNumber: 'SYSTEM_PAYOUT',
+              accountName: bet.user.username || 'WINNER',
             },
           }),
         ]);
 
-        // ၄။ Telegram မှတစ်ဆင့် User ထံသို့ အောင်မြင်ကြောင်း ပို့ခြင်း
-        try {
-          await this.bot.telegram.sendMessage(
-            Number(bet.user.telegramId),
-            `🎉 <b>ဂုဏ်ယူပါတယ်!</b>\n\nလူကြီးမင်းထိုးထားသော <b>${bet.number}</b> ဂဏန်း ပေါက်ပါသည်။\n💰 အနိုင်ရငွေ: <b>${winAmount.toLocaleString()} MMK</b> ကို လက်ကျန်ငွေထဲ ထည့်သွင်းပေးလိုက်ပါပြီ။`,
-            { parse_mode: 'HTML' },
-          );
-        } catch (e) {
-          console.error(`Telegram notify error for user ${bet.userId}:`, e);
-        }
-
+        userData.winNumbers.push(bet.number);
+        userData.totalWinAmount += winAmount;
         winCount++;
       } else {
-        // ❌ မပေါက်သောသူများအတွက် Status ပြောင်းလဲခြင်း
+        // ❌ မပေါက်သောကွက်များအတွက်
         await this.prisma.bet.update({
           where: { id: bet.id },
           data: { status: 'LOSE' },
         });
+        userData.loseNumbers.push(bet.number);
+      }
+    }
 
-        try {
-          await this.bot.telegram.sendMessage(
-            Number(bet.user.telegramId),
-            `😞 စိတ်မကောင်းပါဘူးခင်ဗျာ။\nယနေ့ထွက်ဂဏန်းမှာ <b>${winNumber}</b> ဖြစ်ပြီး လူကြီးမင်းထိုးထားသော <b>${bet.number}</b> မပေါက်ပါ။`,
-            { parse_mode: 'HTML' },
-          );
-        } catch (e) {
-          console.error(`Telegram notify error for user ${bet.userId}:`, e);
-        }
+    // ၃။ 💡 User တစ်ယောက်ချင်းစီအတွက် စာရင်းချုပ် Message တစ်စောင်စီ ပို့ခြင်း
+    for (const [userId, data] of userResults.entries()) {
+      let message = `🔔 <b>${type} ရလဒ် ထွက်ပေါ်လာပါပြီ (${winNumber})</b>\n\n`;
+
+      if (data.winNumbers.length > 0) {
+        message += `🎉 <b>ဂုဏ်ယူပါတယ်!</b>\n`;
+        message += `✅ ပေါက်ဂဏန်း: <b>${data.winNumbers.join(', ')}</b>\n`;
+        message += `💰 စုစုပေါင်းအနိုင်ရငွေ: <b>${data.totalWinAmount.toLocaleString()} MMK</b>\n\n`;
+      }
+
+      if (data.loseNumbers.length > 0) {
+        message += `😞 <b>မပေါက်သောဂဏန်းများ:</b>\n`;
+        message += `❌ ${data.loseNumbers.join(', ')}\n\n`;
+      }
+
+      message += `လက်ကျန်ငွေထဲသို့ အလိုအလျောက် ထည့်သွင်းပေးပြီးပါပြီ။`;
+
+      try {
+        await this.bot.telegram.sendMessage(Number(data.telegramId), message, {
+          parse_mode: 'HTML',
+        });
+      } catch (e) {
+        console.error(`Telegram notify error for user ${userId}:`, e);
       }
     }
 
