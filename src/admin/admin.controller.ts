@@ -274,7 +274,7 @@ export class AdminController {
     if (record && record.adminMessageId) {
       try {
         await this.bot.telegram.editMessageText(
-          process.env.ADMIN_ID, // Bot Admin ရဲ့ Chat ID
+          process.env.ADMIN_CHANNEL_ID, // Bot Admin ရဲ့ Chat ID
           parseInt(record.adminMessageId),
           undefined, // inline_message_id
           `✅ <b>Approved via Dashboard</b>\n\n` +
