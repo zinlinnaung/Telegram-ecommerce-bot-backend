@@ -6,33 +6,62 @@ import { Markup } from 'telegraf';
 @Scene('scene_2d')
 export class TwoDScene {
   private readonly MIN_BET = 500;
-  // Admin Settings (ဒါတွေကို Database ကနေလည်း ဆွဲယူနိုင်ပါတယ်)
-  private readonly GLOBAL_LIMIT_PER_NUMBER = 500000; // ဂဏန်းတစ်လုံးကို စုစုပေါင်း ၅ သိန်းပဲလက်ခံမည်
+  private readonly GLOBAL_LIMIT_PER_NUMBER = 500000; // တစ်လုံးကို အများဆုံး ၅ သိန်း MMK
   private readonly BLOCKED_NUMBERS = ['00', '99', '11']; // ပိတ်ဂဏန်းများ
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private isClosed() {
+  /**
+   * Real-world 2D Session Logic
+   * နံနက်ပိုင်း: 08:00 AM မှ 11:55 AM ထိ
+   * ညနေပိုင်း: 01:00 PM မှ 04:25 PM ထိ
+   */
+  private getSessionInfo() {
     const now = new Date();
     const mmTime = new Date(
       now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }),
     );
-    const currentTime = mmTime.getHours() * 100 + mmTime.getMinutes();
-    return (
-      (currentTime >= 1155 && currentTime < 1201) ||
-      (currentTime >= 1625 && currentTime < 1631)
-    );
+    const hour = mmTime.getHours();
+    const min = mmTime.getMinutes();
+    const currentTime = hour * 100 + min;
+
+    // Morning Session (08:00 - 11:55)
+    if (currentTime >= 800 && currentTime < 1155) {
+      return { isOpen: true, session: 'MORNING' as const, message: '' };
+    }
+
+    // Evening Session (13:00 - 16:25)
+    if (currentTime >= 1300 && currentTime < 1625) {
+      return { isOpen: true, session: 'EVENING' as const, message: '' };
+    }
+
+    // Closed Status & Informative Messages
+    let message = '⚠️ လက်ရှိ 2D ထိုးချိန် မဟုတ်သေးပါ။';
+    if (currentTime >= 1155 && currentTime < 1300) {
+      message =
+        '⚠️ 2D နံနက်ပိုင်း ပိတ်သွားပါပြီ။ နေ့လယ် ၁:၀၀ နာရီတွင် ညနေပိုင်းအတွက် ပြန်ဖွင့်ပါမည်။';
+    } else if (currentTime >= 1625) {
+      message =
+        '⚠️ 2D ယနေ့အတွက် ပိတ်သွားပါပြီ။ မနက်ဖြန် နံနက် ၈:၀၀ နာရီတွင် ပြန်ဖွင့်ပါမည်။';
+    } else if (currentTime < 800) {
+      message = '⚠️ 2D နံနက် ၈:၀၀ နာရီမှသာ စတင်ဖွင့်လှစ်ပါမည်။';
+    }
+
+    return { isOpen: false, session: null, message };
   }
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
-    if (this.isClosed()) {
-      await ctx.reply('⚠️ 2D ပိတ်သွားပါပြီ။');
+    const { isOpen, message } = this.getSessionInfo();
+
+    if (!isOpen) {
+      await ctx.reply(message);
       return ctx.scene.leave();
     }
+
     await ctx.reply(
-      '🎰 <b>2D ထိုးမည် (Limits & Stock Check)</b>\n\n' +
-        '• ဂဏန်းခွဲရိုက်ပါ (e.g., 12-2000 45r-1000 76-1000)\n' +
+      '🎰 <b>2D ထိုးမည်</b>\n\n' +
+        '• ဂဏန်းခွဲရိုက်ပါ (e.g., 12-2000 45r-1000)\n' +
         '• တစ်ကွက်ချင်းစီအတွက် Limit ရှိနိုင်ပါသည်။',
       {
         parse_mode: 'HTML',
@@ -43,9 +72,16 @@ export class TwoDScene {
 
   @On('text')
   async onText(@Ctx() ctx: BotContext) {
+    const { isOpen, message } = this.getSessionInfo();
+    if (!isOpen) {
+      await ctx.reply(message);
+      return ctx.scene.leave();
+    }
+
     const input = (ctx.message as any).text.trim().toLowerCase();
     const state = ctx.scene.state as any;
 
+    // Exit Logic
     if (input === '🏠 ပင်မစာမျက်နှာ' || input === 'exit') {
       await ctx.scene.leave();
       await ctx.reply(
@@ -58,10 +94,10 @@ export class TwoDScene {
           ['📞 အကူအညီ'],
         ]).resize(),
       );
-
       return;
     }
 
+    // Parsing Input
     if (!state.betEntries) {
       const parts = input.split(/[\s,]+/);
       const entries: { number: string; amount?: number }[] = [];
@@ -80,7 +116,7 @@ export class TwoDScene {
           return;
         }
 
-        // --- FIXED: Individual Limit Check during Parsing ---
+        // 2. Limit Check
         if (amount !== undefined) {
           if (amount < this.MIN_BET) {
             await ctx.reply(`❌ အနည်းဆုံး ${this.MIN_BET} ကျပ် ဖြစ်ရပါမည်။`);
@@ -88,13 +124,13 @@ export class TwoDScene {
           }
           if (amount > this.GLOBAL_LIMIT_PER_NUMBER) {
             await ctx.reply(
-              `❌ ဂဏန်း <b>${numOnly}</b> အတွက် Limit သည် <b>${this.GLOBAL_LIMIT_PER_NUMBER.toLocaleString()}</b> MMK သာ ဖြစ်ပါသည်။`,
-              { parse_mode: 'HTML' },
+              `❌ အများဆုံး ${this.GLOBAL_LIMIT_PER_NUMBER.toLocaleString()} MMK သာ ထိုးနိုင်ပါသည်။`,
             );
             return;
           }
         }
 
+        // 3. R (Reverse) Logic
         if (rawNum.endsWith('r')) {
           const num = rawNum.replace('r', '');
           const rev = num.split('').reverse().join('');
@@ -104,29 +140,30 @@ export class TwoDScene {
           entries.push({ number: rawNum, amount });
         }
       }
+
+      if (entries.length === 0) {
+        return ctx.reply('❌ ဂဏန်းပုံစံ မှားယွင်းနေပါသည်။ (e.g., 12-1000)');
+      }
       state.betEntries = entries;
     } else {
+      // Manual amount input if only numbers were provided initially
       const amount = parseInt(input);
-      // --- FIXED: Limit Check for manual amount input ---
       if (isNaN(amount) || amount < this.MIN_BET) {
         return ctx.reply(`❌ အနည်းဆုံး ${this.MIN_BET} ကျပ် ရိုက်ပါ။`);
       }
-      if (amount > this.GLOBAL_LIMIT_PER_NUMBER) {
-        return ctx.reply(
-          `❌ Limit ကျော်လွန်နေပါသည်။ အများဆုံး ${this.GLOBAL_LIMIT_PER_NUMBER.toLocaleString()} အထိသာ ရိုက်ပါ။`,
-        );
-      }
-      state.betEntries = state.betEntries.map((e) => ({
+      state.betEntries = state.betEntries.map((e: any) => ({
         ...e,
         amount: e.amount ?? amount,
       }));
     }
 
-    const allHavePrice = state.betEntries.every((e) => e.amount !== undefined);
+    const allHavePrice = state.betEntries.every(
+      (e: any) => e.amount !== undefined,
+    );
     if (allHavePrice) return this.showConfirmation(ctx);
 
     await ctx.reply(
-      `🎯 ဂဏန်း: <b>${state.betEntries.map((e) => e.number).join(', ')}</b>\n\nမည်မျှဖိုး ထိုးမည်နည်း?`,
+      `🎯 ဂဏန်း: <b>${state.betEntries.map((e: any) => e.number).join(', ')}</b>\n\nမည်မျှဖိုး ထိုးမည်နည်း?`,
       {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
@@ -148,15 +185,7 @@ export class TwoDScene {
     const amount = parseInt((ctx as any).match[1]);
     const state = ctx.scene.state as any;
 
-    // Safety check for button clicks as well
-    if (amount > this.GLOBAL_LIMIT_PER_NUMBER) {
-      return ctx.answerCbQuery(
-        `Limit သည် ${this.GLOBAL_LIMIT_PER_NUMBER} သာရှိပါသည်`,
-        { show_alert: true },
-      );
-    }
-
-    state.betEntries = state.betEntries.map((e) => ({
+    state.betEntries = state.betEntries.map((e: any) => ({
       ...e,
       amount: e.amount ?? amount,
     }));
@@ -168,14 +197,15 @@ export class TwoDScene {
     const state = ctx.scene.state as any;
     let total = 0;
     let summary = '';
-    state.betEntries.forEach((e) => {
+
+    state.betEntries.forEach((e: any) => {
       total += e.amount;
       summary += `• <b>${e.number}</b> 👉 ${e.amount.toLocaleString()} MMK\n`;
     });
     state.totalAmount = total;
 
     await ctx.reply(
-      `📝 <b>ထိုးမည့်စာရင်း အကျဉ်းချုပ်</b>\n\n${summary}\n💰 စုစုပေါင်း: <b>${total.toLocaleString()} MMK</b>\n\nအတည်ပြုပါသလား?`,
+      `📝 <b>ထိုးမည့်စာဉ်း အကျဉ်းချုပ်</b>\n\n${summary}\n💰 စုစုပေါင်း: <b>${total.toLocaleString()} MMK</b>\n\nအတည်ပြုပါသလား?`,
       {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
@@ -184,28 +214,36 @@ export class TwoDScene {
         ]),
       },
     );
-
-    return;
   }
 
   @Action('confirm_bet')
   async handleConfirm(@Ctx() ctx: BotContext) {
+    const { isOpen, session } = this.getSessionInfo();
+    if (!isOpen) {
+      await ctx.answerCbQuery('⚠️ ဆောရီး၊ ပိတ်သွားပါပြီ။', {
+        show_alert: true,
+      });
+      return ctx.scene.leave();
+    }
     await ctx.answerCbQuery('Stock စစ်ဆေးနေပါသည်...');
-    return this.processFinalBet(ctx);
+    return this.processFinalBet(ctx, session!);
   }
 
   @Action('cancel_bet')
   async handleCancel(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
     await ctx.editMessageText('❌ ဖျက်သိမ်းလိုက်ပါသည်။');
     return ctx.scene.leave();
   }
 
-  private async processFinalBet(ctx: BotContext) {
+  private async processFinalBet(
+    ctx: BotContext,
+    session: 'MORNING' | 'EVENING',
+  ) {
     const state = ctx.scene.state as any;
-    const session = new Date().getHours() < 13 ? 'MORNING' : 'EVENING';
 
     try {
-      // --- 2. Real-time Stock Check Logic ---
+      // 1. Stock Check
       for (const bet of state.betEntries) {
         const currentTotal = await this.prisma.bet.aggregate({
           where: {
@@ -220,7 +258,6 @@ export class TwoDScene {
         const alreadyBet = Number(currentTotal._sum.amount || 0);
         if (alreadyBet + bet.amount > this.GLOBAL_LIMIT_PER_NUMBER) {
           const available = this.GLOBAL_LIMIT_PER_NUMBER - alreadyBet;
-          // Clean state so user can retry
           delete state.betEntries;
           return ctx.reply(
             `❌ ဂဏန်း <b>${bet.number}</b> မှာ Limit ပြည့်သွားပါပြီ။\nလက်ကျန် Stock: <b>${available > 0 ? available : 0}</b> MMK သာ ရှိပါတော့သည်။`,
@@ -229,21 +266,24 @@ export class TwoDScene {
         }
       }
 
-      // --- 3. Transaction Safety ---
+      // 2. Balance Check
       const dbUser = await this.prisma.user.findUnique({
-        where: { telegramId: BigInt(ctx.from.id) },
+        where: { telegramId: BigInt(ctx.from!.id) },
       });
-      if (!dbUser || Number(dbUser.balance) < state.totalAmount)
-        return ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
 
+      if (!dbUser || Number(dbUser.balance) < state.totalAmount) {
+        return ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
+      }
+
+      // 3. Transactional Update
       await this.prisma.$transaction(async (tx) => {
-        // ငွေနှုတ်ခြင်း
+        // Increment Balance
         await tx.user.update({
           where: { id: dbUser.id },
           data: { balance: { decrement: state.totalAmount } },
         });
 
-        // စာရင်းသွင်းခြင်း
+        // Create Bets
         for (const bet of state.betEntries) {
           await tx.bet.create({
             data: {
@@ -258,7 +298,7 @@ export class TwoDScene {
       });
 
       await ctx.editMessageText(
-        `✅ <b>အောင်မြင်ပါသည်။</b>\nစုစုပေါင်း: ${state.totalAmount.toLocaleString()} MMK`,
+        `✅ <b>အောင်မြင်ပါသည်။</b>\nSession: ${session}\nစုစုပေါင်း: ${state.totalAmount.toLocaleString()} MMK`,
         { parse_mode: 'HTML' },
       );
     } catch (e) {
