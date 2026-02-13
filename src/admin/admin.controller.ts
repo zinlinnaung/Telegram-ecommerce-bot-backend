@@ -448,6 +448,15 @@ export class AdminController {
     };
   }
 
+  //  // System Settings ကို Database မှ ဆွဲယူသည့် Helper Method
+  //   private async getSettings(): Promise<Record<string, string>> {
+  //     const settings = await this.prisma.systemSetting.findMany();
+  //     return settings.reduce((acc, item) => {
+  //       acc[item.key] = item.value;
+  //       return acc;
+  //     }, {});
+  //   }
+
   @Post('high-low/play')
   async play(
     @Body()
@@ -458,39 +467,75 @@ export class AdminController {
     },
   ) {
     const { telegramId, amount, choice } = body;
-    const tid = BigInt(telegramId);
 
+    // 1. Validation & User Check
+    if (!telegramId || !amount || !choice) {
+      throw new BadRequestException('Data ပြည့်စုံစွာ ပေးပို့ပေးပါ');
+    }
+
+    const tid = BigInt(telegramId);
     const user = await this.prisma.user.findUnique({
       where: { telegramId: tid },
     });
 
-    if (!user || Number(user.balance) < amount)
-      throw new BadRequestException('Insufficient balance');
+    if (!user) {
+      throw new BadRequestException('User ကို ရှာမတွေ့ပါ');
+    }
 
-    // --- Win/Lose Logic ---
+    if (Number(user.balance) < amount) {
+      throw new BadRequestException('လက်ကျန်ငွေ မလုံလောက်ပါ');
+    }
+
+    // 2. Load Settings from DB
     const settings = await this.getSettings();
+    const minBet = parseInt(settings['minBet'] || '500');
+    const maxBet = parseInt(settings['maxBet'] || '100000');
     const winRatio = parseInt(settings['winRatio'] || '40');
     const multiplier = parseFloat(settings['payoutMultiplier'] || '1.8');
 
+    // 3. Min/Max Bet Limit Validation
+    if (amount < minBet) {
+      throw new BadRequestException(
+        `အနည်းဆုံးထိုးငွေမှာ ${minBet.toLocaleString()} MMK ဖြစ်ပါသည်။`,
+      );
+    }
+    if (amount > maxBet) {
+      throw new BadRequestException(
+        `အများဆုံးထိုးငွေမှာ ${maxBet.toLocaleString()} MMK သာဖြစ်ပါသည်။`,
+      );
+    }
+
+    // 4. Win/Lose Logic (RTP Base)
+    // 0-99 ကြား random နှိုက်ပြီး winRatio ထက် ငယ်လျှင် နိုင်စေမည်
     const isWin = Math.floor(Math.random() * 100) < winRatio;
-    const resultNum = isWin
-      ? choice === 'HIGH'
-        ? Math.floor(Math.random() * 50) + 50
-        : Math.floor(Math.random() * 50)
-      : choice === 'HIGH'
-        ? Math.floor(Math.random() * 50)
-        : Math.floor(Math.random() * 50) + 50;
+
+    let resultNum: number;
+    if (isWin) {
+      // နိုင်ရမည် - High ဆိုလျှင် ၅၀-၉၉ ကြား၊ Low ဆိုလျှင် ၀-၄၉ ကြား
+      resultNum =
+        choice === 'HIGH'
+          ? Math.floor(Math.random() * 50) + 50
+          : Math.floor(Math.random() * 50);
+    } else {
+      // ရှုံးရမည် - High ဆိုလျှင် ၀-၄၉ ကြား၊ Low ဆိုလျှင် ၅၀-၉၉ ကြား
+      resultNum =
+        choice === 'HIGH'
+          ? Math.floor(Math.random() * 50)
+          : Math.floor(Math.random() * 50) + 50;
+    }
 
     const payout = isWin ? amount * multiplier : 0;
 
-    // --- DB Transaction ---
-    const updatedUser = await this.prisma.$transaction(async (tx) => {
+    // 5. Database Transaction (Balance Update & Bet Recording)
+    const result = await this.prisma.$transaction(async (tx) => {
+      // ၁။ ပိုက်ဆံ အရင်နှုတ်မည်
       await tx.user.update({
         where: { id: user.id },
         data: { balance: { decrement: amount } },
       });
 
-      const bet = await tx.highLowBet.create({
+      // ၂။ Bet မှတ်တမ်းသွင်းမည်
+      const betRecord = await tx.highLowBet.create({
         data: {
           userId: user.id,
           amount,
@@ -501,40 +546,58 @@ export class AdminController {
         },
       });
 
+      // ၃။ နိုင်လျှင် ပိုက်ဆံပြန်ပေါင်းပေးမည်
+      let finalUser;
       if (isWin) {
-        return await tx.user.update({
+        finalUser = await tx.user.update({
           where: { id: user.id },
           data: { balance: { increment: payout } },
         });
+      } else {
+        finalUser = await tx.user.findUnique({
+          where: { id: user.id },
+        });
       }
-      return await tx.user.findUnique({ where: { id: user.id } });
+
+      return { betRecord, finalUser };
     });
 
-    // --- 💡 Telegram သို့ Notification ပို့ခြင်း (Sync ဖြစ်စေရန်) ---
-    // const resultEmoji = isWin ? '🎉' : '😢';
-    // const statusText = isWin ? `နိုင်ပါတယ် (Winner)` : `ရှုံးပါတယ် (Loser)`;
-
-    // try {
-    //   await this.bot.telegram.sendMessage(
-    //     Number(telegramId),
-    //     `${resultEmoji} <b>High/Low Result</b>\n\n` +
-    //       `ဂဏန်း: <b>${resultNum}</b> (${resultNum >= 50 ? 'HIGH' : 'LOW'})\n` +
-    //       `ရလဒ်: <b>${statusText}</b>\n` +
-    //       `ပမာဏ: <b>${isWin ? '+' : '-'}${isWin ? payout : amount} MMK</b>\n\n` +
-    //       `💰 လက်ကျန်ငွေ: <b>${Number(updatedUser.balance).toLocaleString()} MMK</b>`,
-    //     { parse_mode: 'HTML' },
-    //   );
-    // } catch (e) {
-    //   console.error('Failed to send TG message:', e);
-    // }
-
+    // 6. Return Response to Web App
     return {
-      resultNum,
-      isWin,
-      payout,
-      newBalance: Number(updatedUser.balance),
+      success: true,
+      resultNum: result.betRecord.resultNum,
+      status: result.betRecord.status,
+      payout: Number(result.betRecord.payout),
+      newBalance: Number(result.finalUser.balance),
+      message: isWin ? '🎉 You Win!' : '😞 You Lose!',
     };
   }
+
+  // --- 💡 Telegram သို့ Notification ပို့ခြင်း (Sync ဖြစ်စေရန်) ---
+  // const resultEmoji = isWin ? '🎉' : '😢';
+  // const statusText = isWin ? `နိုင်ပါတယ် (Winner)` : `ရှုံးပါတယ် (Loser)`;
+
+  // try {
+  //   await this.bot.telegram.sendMessage(
+  //     Number(telegramId),
+  //     `${resultEmoji} <b>High/Low Result</b>\n\n` +
+  //       `ဂဏန်း: <b>${resultNum}</b> (${resultNum >= 50 ? 'HIGH' : 'LOW'})\n` +
+  //       `ရလဒ်: <b>${statusText}</b>\n` +
+  //       `ပမာဏ: <b>${isWin ? '+' : '-'}${isWin ? payout : amount} MMK</b>\n\n` +
+  //       `💰 လက်ကျန်ငွေ: <b>${Number(updatedUser.balance).toLocaleString()} MMK</b>`,
+  //     { parse_mode: 'HTML' },
+  //   );
+  // } catch (e) {
+  //   console.error('Failed to send TG message:', e);
+  // }
+
+  //   return {
+  //     resultNum,
+  //     isWin,
+  //     payout,
+  //     newBalance: Number(updatedUser.balance),
+  //   };
+  // }
 
   // private async getSettings() {
   //   const settings = await this.prisma.systemSetting.findMany();
