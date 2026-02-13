@@ -385,7 +385,6 @@ export class AdminController {
       include: { user: true },
     });
 
-    // Bet မရှိရင် success: false ပြန်ပေးမှ Frontend မှာ message ပေါ်မှာပါ
     if (bets.length === 0) {
       return {
         success: false,
@@ -419,12 +418,13 @@ export class AdminController {
           });
         }
 
-        const userData = userResults.get(userId);
+        const data = userResults.get(userId); // Fixed variable name from userData to data for consistency in loop below or just use logic correctly
 
         if (bet.number === winNumber) {
           const multiplier = type === '2D' ? 80 : 500;
           const winAmount = Number(bet.amount) * multiplier;
 
+          // Transaction
           await this.prisma.$transaction([
             this.prisma.user.update({
               where: { id: userId },
@@ -446,15 +446,15 @@ export class AdminController {
             }),
           ]);
 
-          userData.winNumbers.push(bet.number);
-          userData.totalWinAmount += winAmount;
+          data.winNumbers.push(bet.number);
+          data.totalWinAmount += winAmount;
           winCount++;
         } else {
           await this.prisma.bet.update({
             where: { id: bet.id },
             data: { status: 'LOSE' },
           });
-          userData.loseNumbers.push(bet.number);
+          data.loseNumbers.push(bet.number);
         }
       } catch (error) {
         console.error(`Error processing bet ID ${bet.id}:`, error);
@@ -462,23 +462,23 @@ export class AdminController {
       }
     }
 
-    // ၄။ Telegram Notifications
+    // ၄။ Telegram Notifications (Logic ပြင်ဆင်ထားသည့်အပိုင်း)
     const notificationPromises = Array.from(userResults.entries()).map(
       async ([userId, data]) => {
         let message = `🔔 <b>${type} (${targetSession}) ရလဒ် ထွက်ပေါ်လာပါပြီ (${winNumber})</b>\n\n`;
 
+        // ✅ အနိုင်ရရှိသူဖြစ်မှသာ ငွေထည့်သွင်းကြောင်း စာသားထည့်မည်
         if (data.winNumbers.length > 0) {
           message += `🎉 <b>ဂုဏ်ယူပါတယ်!</b>\n`;
           message += `✅ ပေါက်ဂဏန်း: <b>${data.winNumbers.join(', ')}</b>\n`;
-          message += `💰 စုစုပေါင်းအနိုင်ရငွေ: <b>${data.totalWinAmount.toLocaleString()} MMK</b>\n\n`;
+          message += `💰 စုစုပေါင်းအနိုင်ရငွေ: <b>${data.totalWinAmount.toLocaleString()} MMK</b>\n`;
+          message += `ℹ️ <i>လက်ကျန်ငွေထဲသို့ အလိုအလျောက် ထည့်သွင်းပေးပြီးပါပြီ။</i>\n\n`;
         }
 
         if (data.loseNumbers.length > 0) {
           message += `😞 <b>မပေါက်သောဂဏန်းများ:</b>\n`;
           message += `❌ ${data.loseNumbers.join(', ')}\n\n`;
         }
-
-        message += `လက်ကျန်ငွေထဲသို့ အလိုအလျောက် ထည့်သွင်းပေးပြီးပါပြီ။`;
 
         try {
           await this.bot.telegram.sendMessage(data.telegramId, message, {
@@ -499,7 +499,6 @@ export class AdminController {
       message: `${type} ${targetSession} Result (${winNumber}) ထုတ်ပြန်ပြီးပါပြီ။`,
     };
   }
-
   //  // System Settings ကို Database မှ ဆွဲယူသည့် Helper Method
   //   private async getSettings(): Promise<Record<string, string>> {
   //     const settings = await this.prisma.systemSetting.findMany();
