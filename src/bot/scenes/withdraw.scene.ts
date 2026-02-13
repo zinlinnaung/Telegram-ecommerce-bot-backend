@@ -40,14 +40,19 @@ export class WithdrawScene {
         where: { telegramId: BigInt(ctx.from.id) },
       });
 
-      if (isNaN(amount) || amount < 10000)
-        return ctx.reply('❌ အနည်းဆုံး 10,000 ကျပ် ဖြစ်ရပါမယ်။');
-      if (!user || Number(user.balance) < amount)
-        return ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
+      if (isNaN(amount) || amount < 10000) {
+        await ctx.reply('❌ အနည်းဆုံး 10,000 ကျပ် ဖြစ်ရပါမယ်။');
+        return;
+      }
+
+      if (!user || Number(user.balance) < amount) {
+        await ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
+        return;
+      }
 
       state.amount = amount;
       await ctx.reply(
-        '🏦 <b>ငွေထုတ်မည့် နည်းလမ်းကို ရွေးချယ်ပါ</b>',
+        '🏦 ငွေထုတ်မည့် နည်းလမ်းကို ရွေးချယ်ပါ',
         Markup.keyboard([
           ['KPay', 'WaveMoney'],
           ['CB Pay', 'AYAPay'],
@@ -61,7 +66,8 @@ export class WithdrawScene {
     if (!state.method) {
       const validMethods = ['KPay', 'WaveMoney', 'CB Pay', 'AYAPay'];
       if (!validMethods.includes(input)) {
-        return ctx.reply('❌ ကျေးဇူးပြု၍ ခလုတ်ထဲမှ နည်းလမ်းကို ရွေးချယ်ပေးပါ။');
+        await ctx.reply('❌ ကျေးဇူးပြု၍ ခလုတ်ထဲမှ နည်းလမ်းကို ရွေးချယ်ပေးပါ။');
+        return;
       }
       state.method = input;
       await ctx.reply(
@@ -80,9 +86,10 @@ export class WithdrawScene {
     const accountName = parts.slice(1).join(' ');
 
     if (!phone || !accountName) {
-      return ctx.reply(
+      await ctx.reply(
         '❌ ပုံစံမမှန်ပါ။ "ဖုန်းနံပါတ် နာမည်" ဟု သေချာရိုက်ပေးပါ။',
       );
+      return;
     }
 
     try {
