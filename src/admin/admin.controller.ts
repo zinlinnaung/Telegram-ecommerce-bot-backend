@@ -505,10 +505,24 @@ export class AdminController {
       );
     }
 
-    // 4. Win/Lose Logic (RTP Base)
-    // 0-99 ကြား random နှိုက်ပြီး winRatio ထက် ငယ်လျှင် နိုင်စေမည်
-    const isWin = Math.floor(Math.random() * 100) < winRatio;
+    // 4. Win/Lose Logic (RTP Base + Hard Cap)
 
+    // အဆင့် (က) - Random နှိုက်ပြီး နိုင်မနိုင် အရင်ဆုံးဖြတ်သည်
+    let isWin = Math.floor(Math.random() * 100) < winRatio;
+
+    // အဆင့် (ခ) - Win Limit စစ်ဆေးခြင်း
+    const potentialPayout = amount * multiplier;
+    const hardWinLimit = 30000; // လူကြီးမင်းသတ်မှတ်လိုသော Max Win Limit (ဥပမာ - ၁၅,၀၀၀)
+    const doubleBetLimit = amount * 2; // Bet တင်ကြေး၏ ၂ ဆ ထက် မပိုစေရန်
+
+    // အကယ်၍ နိုင်ရန် ဖြစ်နေသော်လည်း Limit ကျော်နေပါက အရှုံးသို့ ပြောင်းမည်
+    if (isWin) {
+      if (potentialPayout > hardWinLimit || potentialPayout > doubleBetLimit) {
+        isWin = false; // Force Lose
+      }
+    }
+
+    // 5. Result Number Generation (isWin အပေါ်မူတည်၍ ဂဏန်းထုတ်ပေးခြင်း)
     let resultNum: number;
     if (isWin) {
       // နိုင်ရမည် - High ဆိုလျှင် ၅၀-၉၉ ကြား၊ Low ဆိုလျှင် ၀-၄၉ ကြား
@@ -524,9 +538,9 @@ export class AdminController {
           : Math.floor(Math.random() * 50) + 50;
     }
 
-    const payout = isWin ? amount * multiplier : 0;
+    const payout = isWin ? potentialPayout : 0;
 
-    // 5. Database Transaction (Balance Update & Bet Recording)
+    // 6. Database Transaction (Balance Update & Bet Recording)
     const result = await this.prisma.$transaction(async (tx) => {
       // ၁။ ပိုက်ဆံ အရင်နှုတ်မည်
       await tx.user.update({
@@ -562,14 +576,14 @@ export class AdminController {
       return { betRecord, finalUser };
     });
 
-    // 6. Return Response to Web App
+    // 7. Return Response to Web App
     return {
       success: true,
       resultNum: result.betRecord.resultNum,
       status: result.betRecord.status,
       payout: Number(result.betRecord.payout),
       newBalance: Number(result.finalUser.balance),
-      isWin: isWin, // <--- ဤ line ကို ဖြည့်စွက်ပေးရပါမည်
+      isWin: isWin,
       message: isWin ? '🎉 You Win!' : '😞 You Lose!',
     };
   }
