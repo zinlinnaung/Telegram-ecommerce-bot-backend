@@ -364,7 +364,7 @@ export class AdminController {
   ) {
     const { type, winNumber } = body;
 
-    // ၁။ Session သတ်မှတ်ခြင်း (Body မှာ ပါလာလျှင် သုံးမည်၊ မပါလျှင် လက်ရှိအချိန်ဖြင့် တွက်မည်)
+    // ၁။ Session ကို Body ကနေယူမယ်၊ မပါလာမှ အချိန်နဲ့တွက်မယ်
     let targetSession = body.session;
 
     if (!targetSession) {
@@ -375,7 +375,7 @@ export class AdminController {
       targetSession = mmTime.getHours() < 13 ? 'MORNING' : 'EVENING';
     }
 
-    // ၂။ ထိုးထားသော Bet များကို Session အလိုက် Fetch လုပ်ခြင်း
+    // ၂။ Bet များကို Fetch လုပ်ခြင်း
     const bets = await this.prisma.bet.findMany({
       where: {
         type,
@@ -385,14 +385,15 @@ export class AdminController {
       include: { user: true },
     });
 
+    // Bet မရှိရင် success: false ပြန်ပေးမှ Frontend မှာ message ပေါ်မှာပါ
     if (bets.length === 0) {
       return {
         success: false,
-        message: `${targetSession} အတွက် တွက်ချက်ရန် PENDING ဖြစ်နေသော Bet မရှိပါ`,
+        winCount: 0,
+        message: `${targetSession} အတွက် တွက်ချက်ရန် Bet မရှိပါ`,
       };
     }
 
-    // ၃။ User အလိုက် ရလဒ်များကို စုစည်းရန် Map တည်ဆောက်ခြင်း
     const userResults = new Map<
       number,
       {
@@ -405,11 +406,10 @@ export class AdminController {
 
     let winCount = 0;
 
-    // ၄။ Database Update & Grouping Logic
+    // ၃။ Database Processing
     for (const bet of bets) {
       try {
         const userId = bet.userId;
-
         if (!userResults.has(userId)) {
           userResults.set(userId, {
             telegramId: bet.user.telegramId.toString(),
@@ -422,22 +422,18 @@ export class AdminController {
         const userData = userResults.get(userId);
 
         if (bet.number === winNumber) {
-          // ✅ အနိုင်ရရှိသူများအတွက်
           const multiplier = type === '2D' ? 80 : 500;
           const winAmount = Number(bet.amount) * multiplier;
 
           await this.prisma.$transaction([
-            // Balance တိုးပေးခြင်း
             this.prisma.user.update({
               where: { id: userId },
               data: { balance: { increment: winAmount } },
             }),
-            // Bet Status ကို WIN ပြောင်းခြင်း
             this.prisma.bet.update({
               where: { id: bet.id },
               data: { status: 'WIN' },
             }),
-            // Withdraw Table တွင် မှတ်တမ်းသွင်းခြင်း
             this.prisma.withdraw.create({
               data: {
                 userId: userId,
@@ -454,7 +450,6 @@ export class AdminController {
           userData.totalWinAmount += winAmount;
           winCount++;
         } else {
-          // ❌ မပေါက်သောသူများအတွက်
           await this.prisma.bet.update({
             where: { id: bet.id },
             data: { status: 'LOSE' },
@@ -467,7 +462,7 @@ export class AdminController {
       }
     }
 
-    // ၅။ Telegram Notifications (User တစ်ယောက်ကို Message တစ်စောင်တည်းသာ ပို့ခြင်း)
+    // ၄။ Telegram Notifications
     const notificationPromises = Array.from(userResults.entries()).map(
       async ([userId, data]) => {
         let message = `🔔 <b>${type} (${targetSession}) ရလဒ် ထွက်ပေါ်လာပါပြီ (${winNumber})</b>\n\n`;
