@@ -123,8 +123,9 @@ export class WithdrawScene {
       );
 
       // Admin Message with Buttons
+      // const channelId = process.env.ADMIN_CHANNEL_ID;
       const adminMsg = await ctx.telegram.sendMessage(
-        process.env.ADMIN_ID,
+        process.env.ADMIN_CHANNEL_ID,
         `🔔 <b>ငွေထုတ်ရန် တောင်းဆိုမှု</b>\n\n` +
           `👤 User: <b>${ctx.from.first_name}</b>\n` +
           `💰 Amount: <b>${state.amount.toLocaleString()} MMK</b>\n` +
