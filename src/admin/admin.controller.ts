@@ -26,79 +26,79 @@ export class AdminController {
     private readonly withdrawService: WithdrawService,
   ) {}
 
-  @Post('products')
-  async createProduct(
-    @Body()
-    body: {
-      name: string;
-      category: string;
-      description?: string;
-      price: number;
-    },
-  ) {
-    return this.prisma.product.create({
-      data: {
-        name: body.name,
-        category: body.category,
-        description: body.description,
-        price: body.price,
-      },
-    });
-  }
+  // @Post('products')
+  // async createProduct(
+  //   @Body()
+  //   body: {
+  //     name: string;
+  //     category: string;
+  //     description?: string;
+  //     price: number;
+  //   },
+  // ) {
+  //   return this.prisma.product.create({
+  //     data: {
+  //       name: body.name,
+  //       category: body.category,
+  //       description: body.description,
+  //       price: body.price,
+  //     },
+  //   });
+  // }
 
-  // 2. Update Product
-  @Put('products/:id')
-  async updateProduct(
-    @Param('id', ParseIntPipe) id: number,
-    @Body()
-    body: {
-      name?: string;
-      category?: string;
-      description?: string;
-      price?: number;
-    },
-  ) {
-    return this.prisma.product.update({
-      where: { id },
-      data: {
-        name: body.name,
-        category: body.category,
-        description: body.description,
-        price: body.price,
-      },
-    });
-  }
+  // // 2. Update Product
+  // @Put('products/:id')
+  // async updateProduct(
+  //   @Param('id', ParseIntPipe) id: number,
+  //   @Body()
+  //   body: {
+  //     name?: string;
+  //     category?: string;
+  //     description?: string;
+  //     price?: number;
+  //   },
+  // ) {
+  //   return this.prisma.product.update({
+  //     where: { id },
+  //     data: {
+  //       name: body.name,
+  //       category: body.category,
+  //       description: body.description,
+  //       price: body.price,
+  //     },
+  //   });
+  // }
 
-  // 3. Delete Product
-  @Delete('products/:id')
-  async deleteProduct(@Param('id', ParseIntPipe) id: number) {
-    // Note: Foreign key constraint ရှိလျှင် Keys များကို အရင်ဖျက်ရပါမည်
-    // သို့သော် Prisma relation တွင် onDelete: Cascade မပါလျှင် manual ဖျက်ရမည်
+  // // 3. Delete Product
+  // @Delete('products/:id')
+  // async deleteProduct(@Param('id', ParseIntPipe) id: number) {
+  //   // Note: Foreign key constraint ရှိလျှင် Keys များကို အရင်ဖျက်ရပါမည်
+  //   // သို့သော် Prisma relation တွင် onDelete: Cascade မပါလျှင် manual ဖျက်ရမည်
 
-    // Linked Keys များကို အရင်ဖျက်ခြင်း
-    await this.prisma.productKey.deleteMany({
-      where: { productId: id },
-    });
+  //   // Linked Keys များကို အရင်ဖျက်ခြင်း
+  //   await this.prisma.productKey.deleteMany({
+  //     where: { productId: id },
+  //   });
 
-    return this.prisma.product.delete({
-      where: { id },
-    });
-  }
+  //   return this.prisma.product.delete({
+  //     where: { id },
+  //   });
+  // }
 
-  // 4. Add Keys (Inventory) to Product
-  @Post('products/:id/keys')
-  async addProductKey(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: { key: string },
-  ) {
-    return this.prisma.productKey.create({
-      data: {
-        key: body.key,
-        productId: id,
-        isUsed: false,
-      },
-    });
-  }
+  // // 4. Add Keys (Inventory) to Product
+  // @Post('products/:id/keys')
+  // async addProductKey(
+  //   @Param('id', ParseIntPipe) id: number,
+  //   @Body() body: { key: string },
+  // ) {
+  //   return this.prisma.productKey.create({
+  //     data: {
+  //       key: body.key,
+  //       productId: id,
+  //       isUsed: false,
+  //     },
+  //   });
+  // }
 
   @Get('dashboard-stats')
   async getStats() {
@@ -736,4 +736,164 @@ export class AdminController {
   //   const settings = await this.prisma.systemSetting.findMany();
   //   return settings.reduce((acc, curr) => ({ ...acc, [curr.key]: curr.value }), {});
   // }
+
+  // 1. Create Product (Updated with 'type')
+  @Post('products')
+  async createProduct(
+    @Body()
+    body: {
+      name: string;
+      category: string;
+      description?: string;
+      price: number;
+      type: 'AUTO' | 'MANUAL'; // Type ထည့်လိုက်ပါပြီ
+    },
+  ) {
+    return this.prisma.product.create({
+      data: {
+        name: body.name,
+        category: body.category,
+        description: body.description,
+        price: body.price,
+        type: body.type || 'AUTO',
+      },
+    });
+  }
+
+  // 2. Update Product (Updated with 'type')
+  @Put('products/:id')
+  async updateProduct(
+    @Param('id', ParseIntPipe) id: number,
+    @Body()
+    body: {
+      name?: string;
+      category?: string;
+      description?: string;
+      price?: number;
+      type?: 'AUTO' | 'MANUAL';
+    },
+  ) {
+    return this.prisma.product.update({
+      where: { id },
+      data: {
+        name: body.name,
+        category: body.category,
+        description: body.description,
+        price: body.price,
+        type: body.type,
+      },
+    });
+  }
+
+  // --- 💡 Game Top-up Order Management (New) ---
+
+  @Post('approve-order/:id')
+  async approveOrder(@Param('id', ParseIntPipe) id: number) {
+    const purchase = await this.prisma.purchase.findUnique({
+      where: { id },
+      include: { user: true, product: true },
+    });
+
+    if (!purchase || purchase.status !== 'PENDING') {
+      throw new BadRequestException('Order not found or already processed');
+    }
+
+    // Status ကို Completed ပြောင်းမယ်
+    await this.prisma.purchase.update({
+      where: { id },
+      data: { status: 'COMPLETED' },
+    });
+
+    // User ဆီ Telegram Notification ပို့မယ်
+    const message =
+      `✅ <b>ဝယ်ယူမှု အောင်မြင်ပါသည်!</b>\n\n` +
+      `📦 Product: <b>${purchase.product.name}</b>\n` +
+      `🆔 ID: <b>${purchase.playerId} (${purchase.serverId})</b>\n\n` +
+      `Admin မှ Diamonds/UC ဖြည့်သွင်းပေးပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`;
+
+    try {
+      await this.bot.telegram.sendMessage(
+        purchase.user.telegramId.toString(),
+        message,
+        { parse_mode: 'HTML' },
+      );
+    } catch (e) {
+      console.error('Failed to notify user', e);
+    }
+
+    return { success: true };
+  }
+
+  @Post('reject-order/:id')
+  async rejectOrder(@Param('id', ParseIntPipe) id: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const purchase = await tx.purchase.findUnique({
+        where: { id },
+        include: { user: true, product: true },
+      });
+
+      if (!purchase || purchase.status !== 'PENDING') {
+        throw new BadRequestException('Order not found or already processed');
+      }
+
+      // 1. Status ကို REJECTED ပြောင်းမယ်
+      await tx.purchase.update({
+        where: { id },
+        data: { status: 'REJECTED' },
+      });
+
+      // 2. ပိုက်ဆံ ပြန်အမ်းမယ် (Refund)
+      await tx.user.update({
+        where: { id: purchase.userId },
+        data: { balance: { increment: purchase.amount } },
+      });
+
+      // 3. Transaction Record သွင်းမယ်
+      await tx.transaction.create({
+        data: {
+          userId: purchase.userId,
+          amount: purchase.amount,
+          type: 'REFUND',
+          description: `Order Rejected Refund: ${purchase.product.name}`,
+        },
+      });
+
+      // User ဆီ Notification ပို့မယ်
+      const message =
+        `❌ <b>ဝယ်ယူမှု ပယ်ဖျက်ခံရပါသည်</b>\n\n` +
+        `📦 Product: ${purchase.product.name}\n` +
+        `💰 <b>${Number(purchase.amount).toLocaleString()} MMK</b> ကို သင့်အကောင့်ထဲသို့ ပြန်လည်ထည့်သွင်းပေးပြီးပါပြီ။\n\n` +
+        `အသေးစိတ်သိရှိလိုပါက Support ကို ဆက်သွယ်ပါ။`;
+
+      try {
+        await this.bot.telegram.sendMessage(
+          purchase.user.telegramId.toString(),
+          message,
+          { parse_mode: 'HTML' },
+        );
+      } catch (e) {
+        console.error('Failed to notify user', e);
+      }
+
+      return { success: true };
+    });
+  }
+
+  // --- အောက်က Functions တွေက မူလအတိုင်းပဲ ထားနိုင်ပါတယ် ---
+
+  @Delete('products/:id')
+  async deleteProduct(@Param('id', ParseIntPipe) id: number) {
+    await this.prisma.productKey.deleteMany({ where: { productId: id } });
+    return this.prisma.product.delete({ where: { id } });
+  }
+
+  @Post('products/:id/keys')
+  async addProductKey(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { key: string },
+  ) {
+    return this.prisma.productKey.create({
+      data: { key: body.key, productId: id, isUsed: false },
+    });
+  }
 }
