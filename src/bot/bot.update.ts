@@ -364,13 +364,121 @@ export class BotUpdate {
     // @ts-ignore
     const productId = parseInt(ctx.match[1]);
 
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    // CHECK IF MANUAL (GAME) OR AUTO (KEY)
+    if (product.type === 'MANUAL') {
+      // Enter the Scene for MLBB/PUBG
+      await ctx.deleteMessage(); // Clean up menu
+      // @ts-ignore
+      await ctx.scene.enter('game_purchase_scene', { productId });
+      return;
+    }
+
+    // EXISTING LOGIC FOR KEYS/AUTO
     await ctx.editMessageText(
-      `❓ ဤပစ္စည်းကို ဝယ်ယူရန် သေချာပါသလား?`,
+      `❓ ဤပစ္စည်းကို ဝယ်ယူရန် သေချာပါသလား?\n\n📦 ${product.name}\n💰 ${product.price} MMK`,
       Markup.inlineKeyboard([
         [Markup.button.callback('✅ ဝယ်ယူရန် အတည်ပြုသည်', `buy_${productId}`)],
         [Markup.button.callback('❌ မဝယ်တော့ပါ', 'shop_main')],
       ]),
     );
+  }
+
+  // ------------------------------------------
+  // 2. ADD THESE NEW ADMIN ACTIONS
+  // ------------------------------------------
+
+  @Action(/^order_done_(.+)$/)
+  async onOrderDone(@Ctx() ctx: BotContext) {
+    // @ts-ignore
+    const purchaseId = parseInt(ctx.match[1]);
+
+    try {
+      const purchase = await this.prisma.purchase.update({
+        where: { id: purchaseId },
+        data: { status: 'COMPLETED' },
+        include: { user: true, product: true },
+      });
+
+      // Update Admin Message
+      const originalText = (ctx.callbackQuery.message as any).text;
+      await ctx.editMessageText(
+        `${originalText}\n\n✅ <b>COMPLETED by ${ctx.from.first_name}</b>`,
+        { parse_mode: 'HTML' },
+      );
+
+      // Notify User
+      await ctx.telegram.sendMessage(
+        Number(purchase.user.telegramId),
+        `✅ <b>Successful!</b>\n\nလူကြီးမင်း ဝယ်ယူထားသော <b>${purchase.product.name}</b> ကို ဂိမ်းအကောင့်ထဲသို့ ထည့်သွင်းပေးလိုက်ပါပြီ။`,
+        { parse_mode: 'HTML' },
+      );
+
+      await ctx.answerCbQuery('Marked as Done');
+    } catch (e) {
+      console.error(e);
+      await ctx.answerCbQuery('Error updating order');
+    }
+  }
+
+  @Action(/^order_reject_(.+)$/)
+  async onOrderReject(@Ctx() ctx: BotContext) {
+    // @ts-ignore
+    const purchaseId = parseInt(ctx.match[1]);
+
+    try {
+      const purchase = await this.prisma.purchase.findUnique({
+        where: { id: purchaseId },
+      });
+
+      if (purchase.status !== 'PENDING')
+        return ctx.answerCbQuery('Already processed');
+
+      // Refund and Reject Transaction
+      await this.prisma.$transaction([
+        this.prisma.purchase.update({
+          where: { id: purchaseId },
+          data: { status: 'REJECTED' },
+        }),
+        this.prisma.user.update({
+          where: { id: purchase.userId },
+          data: { balance: { increment: purchase.amount } },
+        }),
+        this.prisma.transaction.create({
+          data: {
+            userId: purchase.userId,
+            amount: purchase.amount,
+            type: 'REFUND',
+            description: `Order Refund: ${purchaseId}`,
+          },
+        }),
+      ]);
+
+      // Update Admin Message
+      const originalText = (ctx.callbackQuery.message as any).text;
+      await ctx.editMessageText(
+        `${originalText}\n\n❌ <b>REJECTED & REFUNDED by ${ctx.from.first_name}</b>`,
+        { parse_mode: 'HTML' },
+      );
+
+      // Notify User
+      const user = await this.prisma.user.findUnique({
+        where: { id: purchase.userId },
+      });
+      await ctx.telegram.sendMessage(
+        Number(user.telegramId),
+        `❌ <b>Order Cancelled</b>\n\nလူကြီးမင်း၏ Order ကို Admin မှ ပယ်ဖျက်လိုက်ပါသည်။\nငွေ ${purchase.amount} MMK ကို Balance ထဲသို့ ပြန်ထည့်ပေးထားပါသည်။`,
+        { parse_mode: 'HTML' },
+      );
+
+      await ctx.answerCbQuery('Order Rejected & Refunded');
+    } catch (e) {
+      console.error(e);
+      await ctx.answerCbQuery('Error rejecting order');
+    }
   }
 
   @Action(/^buy_(.+)$/)

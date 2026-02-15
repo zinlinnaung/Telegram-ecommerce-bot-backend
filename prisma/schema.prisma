@@ -34,15 +34,15 @@ model User {
   highLowBets  HighLowBet[]
 }
 
-model Product {
-  id          Int          @id @default(autoincrement())
-  name        String
-  category    String // e.g., "VPN", "Netflix"
-  description String?
-  price       Decimal      @db.Decimal(10, 2)
-  keys        ProductKey[]
-  purchases   Purchase[]
-}
+// model Product {
+//   id          Int          @id @default(autoincrement())
+//   name        String
+//   category    String // e.g., "VPN", "Netflix"
+//   description String?
+//   price       Decimal      @db.Decimal(10, 2)
+//   keys        ProductKey[]
+//   purchases   Purchase[]
+// }
 
 model ProductKey {
   id         Int       @id @default(autoincrement())
@@ -75,11 +75,41 @@ model Transaction {
   user        User            @relation(fields: [userId], references: [id])
 }
 
+enum ProductType {
+  AUTO // For VPN Keys, Netflix (Instant)
+  MANUAL // For MLBB, PUBG (Requires Admin Action)
+}
+
+enum PurchaseStatus {
+  PENDING // Waiting for Admin
+  COMPLETED // Done
+  REJECTED // Refunded
+}
+
+// 2. Update Product Model
+model Product {
+  id          Int          @id @default(autoincrement())
+  name        String
+  category    String
+  description String?
+  price       Decimal      @db.Decimal(10, 2)
+  type        ProductType  @default(AUTO) // <--- Add this
+  keys        ProductKey[]
+  purchases   Purchase[]
+}
+
+// 3. Update Purchase Model
 model Purchase {
-  id         Int         @id @default(autoincrement())
-  userId     Int
-  productId  Int
-  amount     Decimal     @db.Decimal(10, 2)
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  productId Int
+  amount    Decimal @db.Decimal(10, 2)
+
+  // New Fields for Games
+  playerId String? // Game User ID
+  serverId String? // Server ID (for MLBB)
+  status   PurchaseStatus @default(COMPLETED) // Default COMPLETED for backward compatibility with Auto products
+
   createdAt  DateTime    @default(now())
   user       User        @relation(fields: [userId], references: [id])
   product    Product     @relation(fields: [productId], references: [id])
