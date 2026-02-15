@@ -8,6 +8,7 @@ import { TwoDScene } from './scenes/two-d.scene';
 import { ThreeDScene } from './scenes/three-d.scene';
 import { WithdrawScene } from './scenes/withdraw.scene';
 import { HighLowScene } from './scenes/high-low.scene';
+import { GamePurchaseScene } from './scenes/game-purchase.scene';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { HighLowScene } from './scenes/high-low.scene';
     ThreeDScene,
     WithdrawScene,
     HighLowScene,
+    GamePurchaseScene,
   ],
 })
 export class BotModule {}
