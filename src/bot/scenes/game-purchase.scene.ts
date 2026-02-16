@@ -97,75 +97,79 @@ export class GamePurchaseScene {
   async validateMLBB(ctx: BotContext, state: GamePurchaseState) {
     const loading = await ctx.reply('⏳ အကောင့်အမည် စစ်ဆေးနေပါသည်...');
 
-    // try {
-    const res = await axios.get(
-      `https://cekidml.caliph.dev/api/validasi?id=${state.playerId}&serverid=${state.serverId}`,
-      { timeout: 8000 },
-    );
+    try {
+      const res = await axios.get(
+        `https://cekidml.caliph.dev/api/validasi?id=${state.playerId}&serverid=${state.serverId}`,
+        { timeout: 8000 },
+      );
 
-    // loading message ကို ဖျက်မယ်
-    await ctx.telegram
-      .deleteMessage(ctx.chat.id, loading.message_id)
-      .catch(() => {});
+      // loading message ကို ဖျက်မယ်
+      await ctx.telegram
+        .deleteMessage(ctx.chat.id, loading.message_id)
+        .catch(() => {});
 
-    // API အောင်မြင်လျှင်
-    if (res.data.status === 'success') {
-      state.nickname = res.data.result?.nickname;
+      // API အောင်မြင်လျှင်
+      if (res.data.status === 'success') {
+        state.nickname = res.data.result?.nickname;
 
+        await ctx.reply(
+          `👤 <b>အကောင့်အမည်တွေ့ရှိချက်:</b>\n\n` +
+            `အမည်: <b>${state.nickname}</b>\n` +
+            `ID: ${state.playerId} (${state.serverId})\n\n` +
+            `အချက်အလက် မှန်ကန်ပါသလား?`,
+          {
+            parse_mode: 'HTML',
+            ...Markup.inlineKeyboard([
+              [
+                Markup.button.callback(
+                  '✅ မှန်ကန်သည်၊ ဝယ်မည်',
+                  'confirm_game_buy',
+                ),
+              ],
+              [
+                Markup.button.callback(
+                  '❌ မှားနေသည်၊ ပြန်ရိုက်မည်',
+                  'restart_input',
+                ),
+              ],
+            ]),
+          },
+        );
+      }
+      // API က failed ဖြစ်လျှင် (ID/Server မှားခြင်း)
+      else {
+        state.playerId = undefined; // Step 1 ကနေ ပြန်စနိုင်အောင် reset လုပ်မယ်
+        state.serverId = undefined;
+
+        await ctx.reply(
+          `❌ <b>ရှာမတွေ့ပါ-</b> ${res.data.message || 'ID သို့မဟုတ် Server မှားယွင်းနေပါသည်။'}\n\n` +
+            `ကျေးဇူးပြု၍ <b>Player ID</b> ကို ပြန်လည်ရိုက်ထည့်ပေးပါ -`,
+          { parse_mode: 'HTML' },
+        );
+      }
+    } catch (e) {
+      await ctx.telegram
+        .deleteMessage(ctx.chat.id, loading.message_id)
+        .catch(() => {});
+
+      // API Down နေလျှင် Manual ဆက်သွားခိုင်းမည်
       await ctx.reply(
-        `👤 <b>အကောင့်အမည်တွေ့ရှိချက်:</b>\n\n` +
-          `အမည်: <b>${state.nickname}</b>\n` +
-          `ID: ${state.playerId} (${state.serverId})\n\n` +
-          `အချက်အလက် မှန်ကန်ပါသလား?`,
+        `⚠️❌ <b>ရှာမတွေ့ပါ-</b>  'ID သို့မဟုတ် Server မှားယွင်းနေပါသည်။'}\n\n` +
+          `ကျေးဇူးပြု၍ <b>Player ID</b> ကို ပြန်လည်ရိုက်ထည့်ပေးပါ -`,
         {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
             [
               Markup.button.callback(
-                '✅ မှန်ကန်သည်၊ ဝယ်မည်',
+                '🚀 အမည်မစစ်ဘဲ ဆက်သွားမည်',
                 'confirm_game_buy',
               ),
             ],
-            [
-              Markup.button.callback(
-                '❌ မှားနေသည်၊ ပြန်ရိုက်မည်',
-                'restart_input',
-              ),
-            ],
+            [Markup.button.callback('❌ မဝယ်တော့ပါ', 'cancel_action')],
           ]),
         },
       );
     }
-    // API က failed ဖြစ်လျှင် (ID/Server မှားခြင်း)
-    else {
-      state.playerId = undefined; // Step 1 ကနေ ပြန်စနိုင်အောင် reset လုပ်မယ်
-      state.serverId = undefined;
-
-      await ctx.reply(
-        `❌ <b>ရှာမတွေ့ပါ-</b> ${res.data.message || 'ID သို့မဟုတ် Server မှားယွင်းနေပါသည်။'}\n\n` +
-          `ကျေးဇူးပြု၍ <b>Player ID</b> ကို ပြန်လည်ရိုက်ထည့်ပေးပါ -`,
-        { parse_mode: 'HTML' },
-      );
-    }
-    // } catch (e) {
-    //   await ctx.telegram
-    //     .deleteMessage(ctx.chat.id, loading.message_id)
-    //     .catch(() => {});
-
-    //   // API Down နေလျှင် Manual ဆက်သွားခိုင်းမည်
-    //   await ctx.reply(
-    //     '⚠️ API Error ကြောင့် အကောင့်စစ်မရပါ။ ID မှန်ကန်ပါက ဆက်သွားနိုင်ပါတယ် -',
-    //     Markup.inlineKeyboard([
-    //       [
-    //         Markup.button.callback(
-    //           '🚀 အမည်မစစ်ဘဲ ဆက်သွားမည်',
-    //           'confirm_game_buy',
-    //         ),
-    //       ],
-    //       [Markup.button.callback('❌ မဝယ်တော့ပါ', 'cancel_action')],
-    //     ]),
-    //   );
-    // }
   }
 
   @Action('confirm_game_buy')
