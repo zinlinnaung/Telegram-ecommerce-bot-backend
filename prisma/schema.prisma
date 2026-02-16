@@ -108,6 +108,7 @@ model Purchase {
   // New Fields for Games
   playerId String? // Game User ID
   serverId String? // Server ID (for MLBB)
+  nickname String? // Game Nickname (for PUBG)
   status   PurchaseStatus @default(COMPLETED) // Default COMPLETED for backward compatibility with Auto products
 
   createdAt  DateTime    @default(now())

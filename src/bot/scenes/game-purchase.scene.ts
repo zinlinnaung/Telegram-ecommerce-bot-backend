@@ -219,6 +219,7 @@ export class GamePurchaseScene {
             amount: state.product.price,
             playerId: state.playerId,
             serverId: state.serverId,
+            nickname: state.nickname,
             status: 'PENDING',
           },
           include: { user: true, product: true },

@@ -125,6 +125,7 @@ export class AdminController {
     const formattedOrders = orders.map((order) => ({
       ...order,
       amount: order.amount.toString(),
+      nickname: (order as any).nickname || 'N/A',
       user: {
         ...order.user,
         telegramId: order.user.telegramId.toString(),
@@ -789,6 +790,7 @@ export class AdminController {
     const message =
       `✅ <b>ဝယ်ယူမှု အောင်မြင်ပါသည်!</b>\n\n` +
       `📦 ပစ္စည်း: <b>${purchase.product.name}</b>\n` +
+      `🎮 အကောင့်အမည်: <b>${(purchase as any).nickname || 'N/A'}</b>\n` +
       `🆔 ID: <code>${purchase.playerId}</code> ${purchase.serverId ? `(${purchase.serverId})` : ''}\n\n` +
       `Admin မှ Diamonds/UC ဖြည့်သွင်းပေးပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`;
 
