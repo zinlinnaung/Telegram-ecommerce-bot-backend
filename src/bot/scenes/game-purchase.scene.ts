@@ -76,10 +76,11 @@ export class GamePurchaseScene {
         state.product.category?.toUpperCase().includes('MLBB');
 
       if (isMLBB) {
-        return await ctx.reply(
+        await ctx.reply(
           '✅ Player ID ရပါပြီ။\n\nကျေးဇူးပြု၍ <b>Server ID</b> ကို ဆက်လက်ရိုက်ထည့်ပေးပါ -',
           { parse_mode: 'HTML' },
         );
+        return;
       } else {
         // MLBB မဟုတ်လျှင် Server ID မလို (N/A)
         state.serverId = 'N/A';
