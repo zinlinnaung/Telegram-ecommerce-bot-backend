@@ -96,17 +96,19 @@ export class AdminController {
   async getAllOrders(
     @Query('status') status?: string,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '50',
+    @Query('limit') limit: string = '10', // Dashboard အတွက် 10 က ပိုသင့်တော်ပါတယ်
   ) {
-    const p = parseInt(page);
-    const l = parseInt(limit);
+    // ၁။ Query Params များကို ကိန်းဂဏန်းအဖြစ်ပြောင်းလဲခြင်း (Validation အပါအဝင်)
+    const p = Math.max(1, parseInt(page) || 1); // အနည်းဆုံး 1 ဖြစ်ရမယ်
+    const l = Math.max(1, parseInt(limit) || 10); // အနည်းဆုံး 1 ဖြစ်ရမယ်
     const skip = (p - 1) * l;
 
     const whereClause: any = {};
-    if (status) {
+    if (status && status !== 'ALL') {
       whereClause.status = status;
     }
 
+    // ၂။ Database မှ Data နှင့် စုစုပေါင်းအရေအတွက်ကို တပြိုင်တည်းဆွဲယူခြင်း
     const [orders, total] = await Promise.all([
       this.prisma.purchase.findMany({
         where: whereClause,
@@ -121,10 +123,11 @@ export class AdminController {
       this.prisma.purchase.count({ where: whereClause }),
     ]);
 
-    // BigInt နဲ့ Decimal တွေကို Frontend အတွက် String ပြောင်းပေးခြင်း
+    // ၃။ Frontend အတွက် Data Format ပြင်ဆင်ခြင်း
     const formattedOrders = orders.map((order) => ({
       ...order,
       amount: order.amount.toString(),
+      // Prisma model မှာ nickname မပါသေးရင် (order as any) သုံးလို့ရပေမဲ့ database မှာ ရှိဖို့တော့လိုပါတယ်
       nickname: (order as any).nickname || 'N/A',
       user: {
         ...order.user,
@@ -133,12 +136,16 @@ export class AdminController {
       },
     }));
 
+    // ၄။ Pagination Meta Data ပြန်ပေးခြင်း
+    const lastPage = Math.ceil(total / l);
+
     return {
       data: formattedOrders,
       meta: {
         total,
         page: p,
-        lastPage: Math.ceil(total / l),
+        lastPage: lastPage || 1, // data မရှိရင်လည်း 1 လို့ပြမယ်
+        limit: l,
       },
     };
   }
