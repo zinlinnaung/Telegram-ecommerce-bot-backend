@@ -787,6 +787,7 @@ export class AdminController {
 
   // --- 💡 Game Top-up Order Management (New) ---
 
+  // ၂။ Order ကို အတည်ပြုခြင်း (Done)
   @Post('approve-order/:id')
   async approveOrder(@Param('id', ParseIntPipe) id: number) {
     const purchase = await this.prisma.purchase.findUnique({
@@ -795,20 +796,21 @@ export class AdminController {
     });
 
     if (!purchase || purchase.status !== 'PENDING') {
-      throw new BadRequestException('Order not found or already processed');
+      throw new BadRequestException(
+        'အော်ဒါရှာမတွေ့ပါ သို့မဟုတ် ကိုင်တွယ်ပြီးသားဖြစ်နေသည်',
+      );
     }
 
-    // Status ကို Completed ပြောင်းမယ်
     await this.prisma.purchase.update({
       where: { id },
       data: { status: 'COMPLETED' },
     });
 
-    // User ဆီ Telegram Notification ပို့မယ်
+    // Telegram Notification
     const message =
       `✅ <b>ဝယ်ယူမှု အောင်မြင်ပါသည်!</b>\n\n` +
-      `📦 Product: <b>${purchase.product.name}</b>\n` +
-      `🆔 ID: <b>${purchase.playerId} (${purchase.serverId})</b>\n\n` +
+      `📦 ပစ္စည်း: <b>${purchase.product.name}</b>\n` +
+      `🆔 ID: <code>${purchase.playerId}</code> ${purchase.serverId ? `(${purchase.serverId})` : ''}\n\n` +
       `Admin မှ Diamonds/UC ဖြည့်သွင်းပေးပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`;
 
     try {
@@ -821,11 +823,15 @@ export class AdminController {
       console.error('Failed to notify user', e);
     }
 
-    return { success: true };
+    return { success: true, message: 'Order completed successfully' };
   }
 
+  // ၃။ Order ကို ပယ်ဖျက်ခြင်း (Reject & Refund)
   @Post('reject-order/:id')
-  async rejectOrder(@Param('id', ParseIntPipe) id: number) {
+  async rejectOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { reason?: string }, // Dashboard ကနေ Reject reason ထည့်ချင်ရင် သုံးနိုင်သည်
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const purchase = await tx.purchase.findUnique({
         where: { id },
@@ -833,37 +839,40 @@ export class AdminController {
       });
 
       if (!purchase || purchase.status !== 'PENDING') {
-        throw new BadRequestException('Order not found or already processed');
+        throw new BadRequestException(
+          'အော်ဒါရှာမတွေ့ပါ သို့မဟုတ် ကိုင်တွယ်ပြီးသားဖြစ်နေသည်',
+        );
       }
 
-      // 1. Status ကို REJECTED ပြောင်းမယ်
+      // 1. Status Update
       await tx.purchase.update({
         where: { id },
         data: { status: 'REJECTED' },
       });
 
-      // 2. ပိုက်ဆံ ပြန်အမ်းမယ် (Refund)
+      // 2. Refund Money
       await tx.user.update({
         where: { id: purchase.userId },
         data: { balance: { increment: purchase.amount } },
       });
 
-      // 3. Transaction Record သွင်းမယ်
+      // 3. Transaction History
       await tx.transaction.create({
         data: {
           userId: purchase.userId,
           amount: purchase.amount,
           type: 'REFUND',
-          description: `Order Rejected Refund: ${purchase.product.name}`,
+          description: `ပယ်ဖျက်လိုက်သော အော်ဒါ #${purchase.id} အတွက် ငွေပြန်အမ်းခြင်း`,
         },
       });
 
-      // User ဆီ Notification ပို့မယ်
+      // 4. Telegram Notification
       const message =
         `❌ <b>ဝယ်ယူမှု ပယ်ဖျက်ခံရပါသည်</b>\n\n` +
-        `📦 Product: ${purchase.product.name}\n` +
-        `💰 <b>${Number(purchase.amount).toLocaleString()} MMK</b> ကို သင့်အကောင့်ထဲသို့ ပြန်လည်ထည့်သွင်းပေးပြီးပါပြီ။\n\n` +
-        `အသေးစိတ်သိရှိလိုပါက Support ကို ဆက်သွယ်ပါ။`;
+        `📦 ပစ္စည်း: ${purchase.product.name}\n` +
+        `💰 ပမာဏ: <b>${Number(purchase.amount).toLocaleString()} MMK</b>\n` +
+        `ℹ️ အကြောင်းပြချက်: ${body.reason || 'အချက်အလက်မှားယွင်းနေခြင်း'}\n\n` +
+        `သင့်အကောင့်ထဲသို့ ငွေပြန်လည်ထည့်သွင်းပေးပြီးပါပြီ။`;
 
       try {
         await this.bot.telegram.sendMessage(
@@ -875,7 +884,7 @@ export class AdminController {
         console.error('Failed to notify user', e);
       }
 
-      return { success: true };
+      return { success: true, message: 'Order rejected and refunded' };
     });
   }
 
