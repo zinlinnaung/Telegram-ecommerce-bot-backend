@@ -26,80 +26,6 @@ export class AdminController {
     private readonly withdrawService: WithdrawService,
   ) {}
 
-  // @Post('products')
-  // async createProduct(
-  //   @Body()
-  //   body: {
-  //     name: string;
-  //     category: string;
-  //     description?: string;
-  //     price: number;
-  //   },
-  // ) {
-  //   return this.prisma.product.create({
-  //     data: {
-  //       name: body.name,
-  //       category: body.category,
-  //       description: body.description,
-  //       price: body.price,
-  //     },
-  //   });
-  // }
-
-  // // 2. Update Product
-  // @Put('products/:id')
-  // async updateProduct(
-  //   @Param('id', ParseIntPipe) id: number,
-  //   @Body()
-  //   body: {
-  //     name?: string;
-  //     category?: string;
-  //     description?: string;
-  //     price?: number;
-  //   },
-  // ) {
-  //   return this.prisma.product.update({
-  //     where: { id },
-  //     data: {
-  //       name: body.name,
-  //       category: body.category,
-  //       description: body.description,
-  //       price: body.price,
-  //     },
-  //   });
-  // }
-
-  // // 3. Delete Product
-  // @Delete('products/:id')
-  // async deleteProduct(@Param('id', ParseIntPipe) id: number) {
-  //   // Note: Foreign key constraint ရှိလျှင် Keys များကို အရင်ဖျက်ရပါမည်
-  //   // သို့သော် Prisma relation တွင် onDelete: Cascade မပါလျှင် manual ဖျက်ရမည်
-
-  //   // Linked Keys များကို အရင်ဖျက်ခြင်း
-  //   await this.prisma.productKey.deleteMany({
-  //     where: { productId: id },
-  //   });
-
-  //   return this.prisma.product.delete({
-  //     where: { id },
-  //   });
-  // }
-
-  // // 4. Add Keys (Inventory) to Product
-  // @Post('products/:id/keys')
-  // async addProductKey(
-  //   @Param('id', ParseIntPipe) id: number,
-  //   @Body() body: { key: string },
-  // ) {
-  //   return this.prisma.productKey.create({
-  //     data: {
-  //       key: body.key,
-  //       productId: id,
-  //       isUsed: false,
-  //     },
-  //   });
-  // }
-
   @Get('dashboard-stats')
   async getStats() {
     const today = new Date();
@@ -109,6 +35,7 @@ export class AdminController {
       userCount,
       pendingDeps,
       pendingWiths,
+      pendingOrders,
       todayPurchases,
       todayWithdrawals,
       todayApprovedDeposits, // ထပ်တိုး- အတည်ပြုပြီးသား ငွေဖြည့်သွင်းမှုများ
@@ -122,6 +49,7 @@ export class AdminController {
         where: { status: 'PENDING' },
         include: { user: true },
       }),
+      this.prisma.purchase.count({ where: { status: 'PENDING' } }),
 
       // ၁။ Product ဝယ်ယူမှုများ (အရောင်းရငွေ)
       this.prisma.purchase.aggregate({
@@ -155,11 +83,62 @@ export class AdminController {
       userCount,
       deposits: pendingDeps,
       withdrawals: pendingWiths,
+      pendingOrdersCount: pendingOrders,
       todayRevenue: totalRevenue, // စုစုပေါင်းဝင်ငွေ
       todayPurchase: purchaseRevenue, // အရောင်းသီးသန့်
       todayDeposit: depositIncome, // ငွေဖြည့်သွင်းမှုသီးသန့်
       todayWithdraw: expense,
       netProfit: netProfit,
+    };
+  }
+
+  @Get('orders')
+  async getAllOrders(
+    @Query('status') status?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '50',
+  ) {
+    const p = parseInt(page);
+    const l = parseInt(limit);
+    const skip = (p - 1) * l;
+
+    const whereClause: any = {};
+    if (status) {
+      whereClause.status = status;
+    }
+
+    const [orders, total] = await Promise.all([
+      this.prisma.purchase.findMany({
+        where: whereClause,
+        skip,
+        take: l,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: true,
+          product: true,
+        },
+      }),
+      this.prisma.purchase.count({ where: whereClause }),
+    ]);
+
+    // BigInt နဲ့ Decimal တွေကို Frontend အတွက် String ပြောင်းပေးခြင်း
+    const formattedOrders = orders.map((order) => ({
+      ...order,
+      amount: order.amount.toString(),
+      user: {
+        ...order.user,
+        telegramId: order.user.telegramId.toString(),
+        balance: order.user.balance.toString(),
+      },
+    }));
+
+    return {
+      data: formattedOrders,
+      meta: {
+        total,
+        page: p,
+        lastPage: Math.ceil(total / l),
+      },
     };
   }
   @Get('products')
