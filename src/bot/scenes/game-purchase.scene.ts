@@ -154,8 +154,7 @@ export class GamePurchaseScene {
 
       // API Down နေလျှင် Manual ဆက်သွားခိုင်းမည်
       await ctx.reply(
-        `⚠️❌ <b>ရှာမတွေ့ပါ-</b>  'ID သို့မဟုတ် Server မှားယွင်းနေပါသည်။'}\n\n` +
-          `ကျေးဇူးပြု၍ <b>Player ID</b> ကို ပြန်လည်ရိုက်ထည့်ပေးပါ -`,
+        `⚠️❌ <b>ရှာမတွေ့ပါ-</b>  'ID သို့မဟုတ် Server မှားယွင်းနေပါသည်။'}\n\n`,
         {
           parse_mode: 'HTML',
           ...Markup.inlineKeyboard([
