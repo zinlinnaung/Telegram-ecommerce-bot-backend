@@ -58,7 +58,8 @@ model Deposit {
   id          Int           @id @default(autoincrement())
   userId      Int
   amount      Decimal       @db.Decimal(10, 2)
-  proofFileId String // Telegram File ID of the slip
+  method      String        @default("Unknown")
+  proofFileId String // Stores Telegram File ID (works for Bot & WebApp now)
   status      DepositStatus @default(PENDING)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
