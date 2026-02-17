@@ -45,7 +45,7 @@ export class BotUpdate {
     );
 
     // Use HTML tags <b> instead of Markdown **
-    const welcomeText = `👋 <b>Welcome ${user.firstName}!</b>\n\n💰 Your Balance: <b>$${user.balance}</b>`;
+    const welcomeText = `👋 <b>Welcome ${user.firstName}!</b>\n\n💰လူကြီးမင်းရဲ့ လက်ရှိလက်ကျန်ငွေ: <b>${user.balance}MMK</b> ဖြစ်ပါတယ်`;
 
     await ctx.reply(welcomeText, {
       parse_mode: 'HTML', // Change this from 'Markdown' to 'HTML'
