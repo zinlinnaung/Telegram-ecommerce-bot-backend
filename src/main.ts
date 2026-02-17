@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getBotToken } from 'nestjs-telegraf';
+import { json, urlencoded } from 'express';
 
 (BigInt.prototype as any).toJSON = function () {
   return this.toString();
@@ -21,6 +22,7 @@ async function bootstrap() {
   app.enableCors({
     origin: '*', // Production ရောက်ရင် 'http://your-admin-domain.com' လို့ ပြောင်းပါ
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
     credentials: true,
   });
 
