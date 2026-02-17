@@ -340,10 +340,37 @@ export class AdminController {
 
   @Post('reject-deposit/:id')
   async rejectDep(@Param('id', ParseIntPipe) id: number) {
-    return await this.prisma.deposit.update({
+    // 1. Update the status AND include the user so we get the Telegram ID
+    const deposit = await this.prisma.deposit.update({
       where: { id },
       data: { status: 'REJECTED' },
+      include: { user: true },
     });
+
+    if (!deposit) throw new NotFoundException('Deposit not found');
+
+    // 2. Send the Telegram Notification via the Bot instance
+    try {
+      const userTid = deposit.user.telegramId.toString(); // BigInt safe
+      const amountStr = Number(deposit.amount).toLocaleString();
+
+      await this.bot.telegram.sendMessage(
+        userTid,
+        `❌ <b>Deposit Rejected (via Dashboard)</b>\n\n` +
+          `လူကြီးမင်း ပေးပို့ထားသော ${amountStr} MMK ငွေဖြည့်သွင်းမှုကို Admin မှ Dashboard မှတစ်ဆင့် ငြင်းပယ်လိုက်ပါသည်။\n\n` +
+          `အကယ်၍ အမှားအယွင်းရှိသည်ဟု ထင်မြင်ပါက Support သို့ ဆက်သွယ်နိုင်ပါသည်။`,
+        { parse_mode: 'HTML' },
+      );
+    } catch (error: any) {
+      // We log the error but don't fail the request,
+      // because the DB update was already successful.
+      console.error('Failed to send rejection notification:', error.message);
+    }
+
+    return {
+      success: true,
+      message: 'Deposit rejected and user notified',
+    };
   }
 
   @Get('settings')
