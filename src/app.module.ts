@@ -8,6 +8,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { LotteryModule } from './lottery/lottery.module';
 import { AdminController } from './admin/admin.controller';
 import { WithdrawService } from './wallet/withdraw.service';
+import { WalletService } from './wallet/wallet.service';
 
 @Module({
   imports: [
@@ -41,8 +42,9 @@ import { WithdrawService } from './wallet/withdraw.service';
   controllers: [AdminController],
   providers: [
     WithdrawService, // 👈 ဤနေရာတွင် WithdrawService ကို ထည့်ပေးရပါမည်
+    WalletService, // 👈 WalletService ကိုလည်း ထည့်ပေးရပါမည်
     // ... အခြား providers (PrismaService, etc.)
   ],
-  exports: [WithdrawService],
+  exports: [WithdrawService, WalletService],
 })
 export class AppModule {}
