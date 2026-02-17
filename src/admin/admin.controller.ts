@@ -12,6 +12,7 @@ import {
   Query,
   UseInterceptors,
   UploadedFile,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectBot } from 'nestjs-telegraf';
@@ -23,6 +24,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import { WalletService } from 'src/wallet/wallet.service';
+import { CreateDepositDto } from './dto/deposit.dto';
 
 @Controller('admin')
 export class AdminController {
@@ -902,73 +904,50 @@ export class AdminController {
   }
 
   @Post('deposit-with-image')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: diskStorage({
-        destination: './uploads', // ✅ Save files to 'uploads' folder
-        filename: (req, file, cb) => {
-          const randomName = Array(32)
-            .fill(null)
-            .map(() => Math.round(Math.random() * 16).toString(16))
-            .join('');
-          cb(null, `${randomName}${extname(file.originalname)}`);
-        },
-      }),
-    }),
-  )
-  @Post('deposit-with-image')
-  @UseInterceptors(
-    FileInterceptor('image', {
-      storage: memoryStorage(), // ✅ Store file in RAM temporarily
-    }),
-  )
+  @UseInterceptors(FileInterceptor('image', { storage: memoryStorage() }))
   async depositWithImage(
     @UploadedFile() file: Express.Multer.File,
-    @Body() body: any,
+    @Body() body: CreateDepositDto, // 👈 Use DTO instead of 'any'
   ) {
-    if (!file) throw new Error('File is missing');
-    const { telegramId, amount, method } = body;
+    if (!file) throw new BadRequestException('Image file is missing');
 
-    // 1. Send the image buffer DIRECTLY to Admin Channel
+    const { telegramId, amount, method } = body;
     const adminChannelId = process.env.ADMIN_CHANNEL_ID;
 
-    // We send a "Pre-notification" to get the File ID
-    const message = await this.bot.telegram.sendPhoto(
-      adminChannelId,
-      { source: file.buffer }, // ✅ Send buffer
-      {
-        caption: `🔄 <b>Processing WebApp Deposit...</b>\n\nUser: ${telegramId}\nAmount: ${amount}`,
-        parse_mode: 'HTML',
-      },
-    );
+    try {
+      // 1. Send to Telegram
+      const message = await this.bot.telegram.sendPhoto(
+        adminChannelId,
+        { source: file.buffer },
+        {
+          caption: `🔄 <b>Processing WebApp Deposit...</b>\n\nUser: ${telegramId}\nAmount: ${amount}`,
+          parse_mode: 'HTML',
+        },
+      );
 
-    // 2. Extract the best quality File ID from the sent message
-    // Telegram returns an array of photo sizes; the last one is the biggest.
-    const fileId = message.photo[message.photo.length - 1].file_id;
+      const fileId = message.photo[message.photo.length - 1].file_id;
 
-    // 3. Save to Database with the File ID
-    const deposit = await this.walletService.createDepositFromWebApp({
-      telegramId,
-      amount: Number(amount),
-      method,
-      proofFileId: fileId, // ✅ Storing the ID, not the file
-    });
+      // 2. Save to DB
+      const deposit = await this.walletService.createDepositFromWebApp({
+        telegramId,
+        amount: Number(amount),
+        method,
+        proofFileId: fileId,
+      });
 
-    // 4. Update the Admin Message with Buttons
-    // We edit the message we just sent to add the Approve/Reject buttons
-    await this.bot.telegram.editMessageCaption(
-      adminChannelId,
-      message.message_id,
-      undefined,
-      `🌐 <b>New WebApp Deposit Request</b>\n` +
-        `➖➖➖➖➖➖➖➖➖➖\n` +
-        `👤 User: <b>${deposit.user.firstName}</b>\n` +
-        `💰 Amount: <b>${Number(amount).toLocaleString()} MMK</b>\n` +
-        `💳 Method: <b>${method}</b>\n` +
-        `#Deposit_${deposit.id}`,
-      {
-        parse_mode: 'HTML',
-        ...{
+      // 3. Update Admin Message with Action Buttons
+      await this.bot.telegram.editMessageCaption(
+        adminChannelId,
+        message.message_id,
+        undefined,
+        `🌐 <b>New WebApp Deposit Request</b>\n` +
+          `➖➖➖➖➖➖➖➖➖➖\n` +
+          `👤 User: <b>${deposit.user.firstName}</b>\n` +
+          `💰 Amount: <b>${Number(amount).toLocaleString()} MMK</b>\n` +
+          `💳 Method: <b>${method}</b>\n` +
+          `#Deposit_${deposit.id}`,
+        {
+          parse_mode: 'HTML',
           reply_markup: {
             inline_keyboard: [
               [
@@ -984,9 +963,12 @@ export class AdminController {
             ],
           },
         },
-      },
-    );
+      );
 
-    return { success: true, message: 'Deposit processed' };
+      return { success: true };
+    } catch (error) {
+      console.error('Deposit Error:', error);
+      throw new InternalServerErrorException('Failed to process deposit');
+    }
   }
 }
