@@ -32,7 +32,7 @@ export const GAME_KEYBOARD = Markup.keyboard([
 @Update()
 @UseFilters(TelegrafExceptionFilter)
 export class BotUpdate {
-  private readonly CHANNEL_ID = '@Prototype004905';
+  private readonly CHANNEL_ID = '-1002052753323';
   private readonly BONUS_AMOUNT = 3000;
   constructor(
     @InjectBot() private readonly bot: Telegraf<BotContext>,
