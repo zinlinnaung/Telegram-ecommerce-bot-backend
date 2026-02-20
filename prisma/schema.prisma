@@ -11,6 +11,7 @@ enum TransactionType {
   DEPOSIT
   PURCHASE
   REFUND
+  WITHDRAW
 }
 
 enum DepositStatus {

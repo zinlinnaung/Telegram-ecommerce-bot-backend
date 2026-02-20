@@ -65,16 +65,16 @@ export class BotUpdate {
         });
 
         if (referrer) {
-          // 1. Give the referrer 300 MMK
+          // 1. Give the referrer 100 MMK
           await this.prisma.$transaction([
             this.prisma.user.update({
               where: { id: referrer.id },
-              data: { balance: { increment: 300 } },
+              data: { balance: { increment: 100 } },
             }),
             this.prisma.transaction.create({
               data: {
                 userId: referrer.id,
-                amount: 300,
+                amount: 100,
                 type: 'DEPOSIT', // Kept as DEPOSIT to match your DB schema
                 description: `🎁 Referral Bonus for inviting ${ctx.from.first_name}`,
               },
@@ -85,7 +85,7 @@ export class BotUpdate {
           try {
             await this.bot.telegram.sendMessage(
               referrerTelegramId,
-              `🎉 <b>Referral အောင်မြင်ပါသည်!</b>\n\nမိတ်ဆွေ၏ Link မှတဆင့် <b>${ctx.from.first_name}</b> ဝင်ရောက်လာတဲ့အတွက် အပိုဆု <b>300 MMK</b> ကို Balance ထဲသို့ ထည့်သွင်းပေးလိုက်ပါတယ်။`,
+              `🎉 <b>Referral အောင်မြင်ပါသည်!</b>\n\nမိတ်ဆွေ၏ Link မှတဆင့် <b>${ctx.from.first_name}</b> ဝင်ရောက်လာတဲ့အတွက် အပိုဆု <b>100 MMK</b> ကို Balance ထဲသို့ ထည့်သွင်းပေးလိုက်ပါတယ်။`,
               { parse_mode: 'HTML' },
             );
           } catch (e) {
@@ -267,7 +267,7 @@ export class BotUpdate {
 
     const refText =
       `👥 <b>မိတ်ဆွေများကို ဖိတ်ခေါ်ပါ။</b>\n\n` +
-      `အောက်ပါ Link ကိုအသုံးပြုပြီး သူငယ်ချင်းများကို ဖိတ်ခေါ်ကာ တစ်ဦးလျှင် <b>300 MMK</b> အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
+      `အောက်ပါ Link ကိုအသုံးပြုပြီး သူငယ်ချင်းများကို ဖိတ်ခေါ်ကာ တစ်ဦးလျှင် <b>100 MMK</b> အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
       `📊 <b>သင်၏ ဖိတ်ခေါ်မှု မှတ်တမ်း:</b>\n` +
       `• ဖိတ်ခေါ်ထားသူ အရေအတွက်: <b>${totalReferrals}</b> ဦး\n` +
       `• ရရှိထားသော စုစုပေါင်းဆုငွေ: <b>${totalEarned} MMK</b>\n\n` +
