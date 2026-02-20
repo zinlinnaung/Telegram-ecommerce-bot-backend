@@ -177,78 +177,78 @@ export class TwoDScene {
     const state = ctx.scene.state as any;
     const tid = BigInt(ctx.from!.id);
 
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        const user = await tx.user.findUnique({ where: { telegramId: tid } });
-        if (!user) throw new Error('USER_NOT_FOUND');
+    // try {
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({ where: { telegramId: tid } });
+      if (!user) throw new Error('USER_NOT_FOUND');
 
-        let netAmount = state.totalAmount;
-        let commPercentage = 0;
+      let netAmount = state.totalAmount;
+      let commPercentage = 0;
 
-        if (user.isReseller) {
-          commPercentage = Number(user.commission || 15);
-          netAmount = state.totalAmount * (1 - commPercentage / 100);
-        }
+      if (user.isReseller) {
+        commPercentage = Number(user.commission || 15);
+        netAmount = state.totalAmount * (1 - commPercentage / 100);
+      }
 
-        if (Number(user.balance) < netAmount) throw new Error('LOW_BALANCE');
+      if (Number(user.balance) < netAmount) throw new Error('LOW_BALANCE');
 
-        for (const bet of state.betEntries) {
-          const stats = await tx.bet.aggregate({
-            where: {
-              number: bet.number,
-              session,
-              type: '2D',
-              createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-            },
-            _sum: { amount: true },
-          });
-          if (
-            Number(stats._sum.amount || 0) + bet.amount >
-            this.GLOBAL_LIMIT_PER_NUMBER
-          )
-            throw new Error(`LIMIT:${bet.number}`);
-        }
-
-        await tx.user.update({
-          where: { id: user.id },
-          data: { balance: { decrement: netAmount } },
-        });
-        await tx.bet.createMany({
-          data: state.betEntries.map((e) => ({
-            userId: user.id,
-            type: '2D',
-            number: e.number,
-            amount: e.amount,
+      for (const bet of state.betEntries) {
+        const stats = await tx.bet.aggregate({
+          where: {
+            number: bet.number,
             session,
-          })),
-        });
-        await tx.transaction.create({
-          data: {
-            userId: user.id,
-            amount: netAmount,
-            type: 'PURCHASE',
-            description: user.isReseller
-              ? `2D Reseller (${commPercentage}%)`
-              : `2D Regular`,
+            type: '2D',
+            createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
           },
+          _sum: { amount: true },
         });
+        if (
+          Number(stats._sum.amount || 0) + bet.amount >
+          this.GLOBAL_LIMIT_PER_NUMBER
+        )
+          throw new Error(`LIMIT:${bet.number}`);
+      }
 
-        await ctx.editMessageText(
-          `✅ <b>အောင်မြင်ပါသည်။</b>\n\n📅 Date: ${new Date().toLocaleDateString()}\n🕒 Session: ${session}\n💰 Total: ${state.totalAmount.toLocaleString()} MMK` +
-            (user.isReseller
-              ? `\n📉 Net Paid: ${netAmount.toLocaleString()}`
-              : ''),
-          { parse_mode: 'HTML' },
-        );
+      await tx.user.update({
+        where: { id: user.id },
+        data: { balance: { decrement: netAmount } },
       });
-    } catch (e: any) {
-      const msg = e.message.startsWith('LIMIT:')
-        ? `❌ ဂဏန်း ${e.message.split(':')[1]} Limit ပြည့်ပါပြီ`
-        : e.message === 'LOW_BALANCE'
-          ? '❌ လက်ကျန်ငွေ မလုံလောက်ပါ'
-          : '❌ အမှားအယွင်းရှိပါသည်';
-      await ctx.reply(msg);
-    }
+      await tx.bet.createMany({
+        data: state.betEntries.map((e) => ({
+          userId: user.id,
+          type: '2D',
+          number: e.number,
+          amount: e.amount,
+          session,
+        })),
+      });
+      await tx.transaction.create({
+        data: {
+          userId: user.id,
+          amount: netAmount,
+          type: 'PURCHASE',
+          description: user.isReseller
+            ? `2D Reseller (${commPercentage}%)`
+            : `2D Regular`,
+        },
+      });
+
+      await ctx.editMessageText(
+        `✅ <b>အောင်မြင်ပါသည်။</b>\n\n📅 Date: ${new Date().toLocaleDateString()}\n🕒 Session: ${session}\n💰 Total: ${state.totalAmount.toLocaleString()} MMK` +
+          (user.isReseller
+            ? `\n📉 Net Paid: ${netAmount.toLocaleString()}`
+            : ''),
+        { parse_mode: 'HTML' },
+      );
+    });
+    // } catch (e: any) {
+    //   const msg = e.message.startsWith('LIMIT:')
+    //     ? `❌ ဂဏန်း ${e.message.split(':')[1]} Limit ပြည့်ပါပြီ`
+    //     : e.message === 'LOW_BALANCE'
+    //       ? '❌ လက်ကျန်ငွေ မလုံလောက်ပါ'
+    //       : '❌ အမှားအယွင်းရှိပါသည်';
+    //   await ctx.reply(msg);
+    // }
     return ctx.scene.leave();
   }
 
