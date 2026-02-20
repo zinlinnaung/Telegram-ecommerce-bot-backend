@@ -21,7 +21,7 @@ export const MAIN_KEYBOARD = Markup.keyboard([
   ['🎮 ဂိမ်းကစားမယ်'], // This is your new Category
   ['🛒 စျေးဝယ်မယ်', '💰 လက်ကျန်ငွေ'],
   ['➕ ငွေဖြည့်မယ်', '💸 ငွေထုတ်မယ်'],
-  ['📞 အကူအညီ'],
+  ['👥 ဖိတ်ခေါ်မယ်', '📞 အကူအညီ'],
 ]).resize();
 export const GAME_KEYBOARD = Markup.keyboard([
   ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
@@ -45,8 +45,59 @@ export class BotUpdate {
 
   @Start()
   async onStart(@Ctx() ctx: BotContext) {
+    const telegramId = Number(ctx.from.id);
+    const text = (ctx.message as any)?.text || '';
+    const payload = text.split(' ')[1]; // Extracts "ref_123456789" from "/start ref_123456789"
+
+    // [NEW] Referral Logic: Check if the user is completely new BEFORE creating them
+    const isNewUser =
+      (await this.prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) },
+      })) === null;
+
+    if (isNewUser && payload && payload.startsWith('ref_')) {
+      const referrerTelegramId = Number(payload.replace('ref_', ''));
+
+      // Prevent users from referring themselves
+      if (referrerTelegramId !== telegramId) {
+        const referrer = await this.prisma.user.findUnique({
+          where: { telegramId: BigInt(referrerTelegramId) },
+        });
+
+        if (referrer) {
+          // 1. Give the referrer 300 MMK
+          await this.prisma.$transaction([
+            this.prisma.user.update({
+              where: { id: referrer.id },
+              data: { balance: { increment: 300 } },
+            }),
+            this.prisma.transaction.create({
+              data: {
+                userId: referrer.id,
+                amount: 300,
+                type: 'DEPOSIT', // Kept as DEPOSIT to match your DB schema
+                description: `🎁 Referral Bonus for inviting ${ctx.from.first_name}`,
+              },
+            }),
+          ]);
+
+          // 2. Notify the referrer that they got money
+          try {
+            await this.bot.telegram.sendMessage(
+              referrerTelegramId,
+              `🎉 <b>Referral အောင်မြင်ပါသည်!</b>\n\nမိတ်ဆွေ၏ Link မှတဆင့် <b>${ctx.from.first_name}</b> ဝင်ရောက်လာတဲ့အတွက် အပိုဆု <b>300 MMK</b> ကို Balance ထဲသို့ ထည့်သွင်းပေးလိုက်ပါတယ်။`,
+              { parse_mode: 'HTML' },
+            );
+          } catch (e) {
+            // Ignore if the referrer has blocked the bot
+          }
+        }
+      }
+    }
+
+    // Now proceed with normal creation
     const user = await this.usersService.findOrCreateUser(
-      Number(ctx.from.id),
+      telegramId,
       ctx.from.first_name,
       ctx.from.username,
     );
@@ -189,6 +240,42 @@ export class BotUpdate {
     await ctx.reply('🎮 ကစားလိုသည့် ဂိမ်းအမျိုးအစားကို ရွေးချယ်ပေးပါခင်ဗျာ -', {
       ...GAME_KEYBOARD,
     });
+  }
+
+  @Hears('👥 ဖိတ်ခေါ်မယ်')
+  async onReferral(@Ctx() ctx: BotContext) {
+    const telegramId = ctx.from.id;
+
+    // Get the bot's username automatically so the link is always correct
+    const botInfo = await ctx.telegram.getMe();
+    const refLink = `https://t.me/${botInfo.username}?start=ref_${telegramId}`;
+
+    // Find the user and all their Referral Bonus transactions
+    const user = await this.prisma.user.findUnique({
+      where: { telegramId: BigInt(telegramId) },
+      include: {
+        transactions: {
+          where: { description: { startsWith: '🎁 Referral Bonus' } },
+        },
+      },
+    });
+
+    // Calculate totals based on transactions
+    const totalReferrals = user?.transactions.length || 0;
+    const totalEarned =
+      user?.transactions.reduce((sum, t) => sum + Number(t.amount), 0) || 0;
+
+    const refText =
+      `👥 <b>မိတ်ဆွေများကို ဖိတ်ခေါ်ပါ။</b>\n\n` +
+      `အောက်ပါ Link ကိုအသုံးပြုပြီး သူငယ်ချင်းများကို ဖိတ်ခေါ်ကာ တစ်ဦးလျှင် <b>300 MMK</b> အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
+      `📊 <b>သင်၏ ဖိတ်ခေါ်မှု မှတ်တမ်း:</b>\n` +
+      `• ဖိတ်ခေါ်ထားသူ အရေအတွက်: <b>${totalReferrals}</b> ဦး\n` +
+      `• ရရှိထားသော စုစုပေါင်းဆုငွေ: <b>${totalEarned} MMK</b>\n\n` +
+      `🔗 <b>သင်၏ ဖိတ်ခေါ်ရန် Link:</b>\n` +
+      `<code>${refLink}</code>\n\n` +
+      `<i>(အပေါ်က Link လေးကို တစ်ချက်နှိပ်ရုံဖြင့် Copy ကူးယူနိုင်ပါတယ်ခင်ဗျာ)</i>`;
+
+    await ctx.reply(refText, { parse_mode: 'HTML' });
   }
 
   @Hears('🏠 ပင်မစာမျက်နှာ')
