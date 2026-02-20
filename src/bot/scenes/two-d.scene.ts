@@ -2,6 +2,7 @@ import { Scene, SceneEnter, On, Ctx, Action } from 'nestjs-telegraf';
 import { BotContext } from 'src/interfaces/bot-context.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Markup } from 'telegraf';
+import { MAIN_KEYBOARD } from '../bot.update';
 
 @Scene('scene_2d')
 export class TwoDScene {
@@ -84,16 +85,10 @@ export class TwoDScene {
     // Exit Logic
     if (input === '🏠 ပင်မစာမျက်နှာ' || input === 'exit') {
       await ctx.scene.leave();
-      await ctx.reply(
-        '🏠 ပင်မစာမျက်နှာသို့ ပြန်ရောက်ပါပြီ။',
-        Markup.keyboard([
-          ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
-          ['🎲 အနိမ့်/အမြင့်', '🛒 စျေးဝယ်မယ်'],
-          ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
-          ['📝 ထိုးမှတ်တမ်း', '💸 ငွေထုတ်မယ်'],
-          ['📞 အကူအညီ'],
-        ]).resize(),
-      );
+      await ctx.reply('🏠 ပင်မစာမျက်နှာသို့ ပြန်ရောက်ပါပြီ။', {
+        parse_mode: 'HTML',
+        ...MAIN_KEYBOARD,
+      });
       return;
     }
 

@@ -18,11 +18,15 @@ import { BotContext } from 'src/interfaces/bot-context.interface';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const MAIN_KEYBOARD = Markup.keyboard([
-  ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
-  ['🎲 အနိမ့်/အမြင့်', '🛒 စျေးဝယ်မယ်'],
-  ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
-  ['📝 ထိုးမှတ်တမ်း', '💸 ငွေထုတ်မယ်'],
+  ['🎮 ဂိမ်းကစားမယ်'], // This is your new Category
+  ['🛒 စျေးဝယ်မယ်', '💰 လက်ကျန်ငွေ'],
+  ['➕ ငွေဖြည့်မယ်', '💸 ငွေထုတ်မယ်'],
   ['📞 အကူအညီ'],
+]).resize();
+export const GAME_KEYBOARD = Markup.keyboard([
+  ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
+  ['🎲 အနိမ့်/အမြင့်', '📝 ထိုးမှတ်တမ်း'],
+  ['🏠 ပင်မစာမျက်နှာ'], // To go back to main menu
 ]).resize();
 
 @Update()
@@ -79,14 +83,18 @@ export class BotUpdate {
     );
   }
 
+  @Hears('🎮 ဂိမ်းကစားမယ်')
+  async onPlayGameMenu(@Ctx() ctx: BotContext) {
+    await ctx.reply('🎮 ကစားလိုသည့် ဂိမ်းအမျိုးအစားကို ရွေးချယ်ပေးပါခင်ဗျာ -', {
+      ...GAME_KEYBOARD,
+    });
+  }
+
   @Hears('🏠 ပင်မစာမျက်နှာ')
   async onHome(@Ctx() ctx: BotContext) {
     try {
-      // ၁။ Scene ထဲမှာ ရှိနေရင် အရင်ထွက်မယ်
       await ctx.scene.leave();
-    } catch (e) {
-      // Scene ထဲမှာ မရှိရင် error တက်နိုင်လို့ ignore လုပ်မယ်
-    }
+    } catch (e) {}
 
     const user = await this.usersService.findOrCreateUser(
       Number(ctx.from.id),
@@ -94,12 +102,11 @@ export class BotUpdate {
       ctx.from.username,
     );
 
-    // ၂။ အဓိကအချက်- Keyboard ပါတဲ့ message ကို ပြန်ပို့ပေးရပါမယ်
     await ctx.reply(
       `🏠 <b>ပင်မစာမျက်နှာသို့ ပြန်ရောက်ပါပြီ။</b>\n\n💰 လက်ရှိလက်ကျန်ငွေ: <b>${user.balance} MMK</b>`,
       {
         parse_mode: 'HTML',
-        ...MAIN_KEYBOARD, // Keyboard ကို ပြန်ပြောင်းခိုင်းတာဖြစ်ပါတယ်
+        ...MAIN_KEYBOARD, // Show the Main Menu again
       },
     );
   }

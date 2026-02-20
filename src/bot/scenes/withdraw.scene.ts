@@ -2,18 +2,19 @@ import { Ctx, On, Scene, SceneEnter } from 'nestjs-telegraf';
 import { BotContext } from 'src/interfaces/bot-context.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Markup } from 'telegraf';
+import { MAIN_KEYBOARD } from '../bot.update';
 
 @Scene('withdraw_scene')
 export class WithdrawScene {
   constructor(private readonly prisma: PrismaService) {}
 
-  private mainMenu = Markup.keyboard([
-    ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
-    ['🎲 အနိမ့်/အမြင့်', '🛒 စျေးဝယ်မယ်'],
-    ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
-    ['📝 ထိုးမှတ်တမ်း', '💸 ငွေထုတ်မယ်'],
-    ['📞 အကူအညီ'],
-  ]).resize();
+  // private mainMenu = Markup.keyboard([
+  //   ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
+  //   ['🎲 အနိမ့်/အမြင့်', '🛒 စျေးဝယ်မယ်'],
+  //   ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
+  //   ['📝 ထိုးမှတ်တမ်း', '💸 ငွေထုတ်မယ်'],
+  //   ['📞 အကူအညီ'],
+  // ]).resize();
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
@@ -29,7 +30,7 @@ export class WithdrawScene {
     const state = ctx.scene.state as any;
 
     if (input === '❌ ပယ်ဖျက်မည်') {
-      await ctx.reply('ငွေထုတ်ယူခြင်းကို ပယ်ဖျက်လိုက်ပါပြီ။', this.mainMenu);
+      await ctx.reply('ငွေထုတ်ယူခြင်းကို ပယ်ဖျက်လိုက်ပါပြီ။', MAIN_KEYBOARD);
       return ctx.scene.leave();
     }
 
@@ -129,7 +130,7 @@ export class WithdrawScene {
       // User Confirmation
       await ctx.reply(
         '✅ ငွေထုတ်ယူရန် တောင်းဆိုမှု အောင်မြင်ပါသည်။\nAdmin မှ စစ်ဆေးပြီး အမြန်ဆုံး လွှဲပေးပါလိမ့်မည်။',
-        this.mainMenu,
+        MAIN_KEYBOARD,
       );
 
       // Admin Message with Buttons
@@ -168,7 +169,7 @@ export class WithdrawScene {
       return ctx.scene.leave();
     } catch (e) {
       console.error(e);
-      await ctx.reply('❌ အမှားအယွင်းရှိသွားပါသည်။', this.mainMenu);
+      await ctx.reply('❌ အမှားအယွင်းရှိသွားပါသည်။', MAIN_KEYBOARD);
       return ctx.scene.leave();
     }
   }
