@@ -39,16 +39,30 @@ export class TwoDScene {
     //   await ctx.reply(message);
     //   return ctx.scene.leave();
     // }
+    const manual =
+      `🎰 <b>2D ထိုးသားလက်စွဲ (Reseller Manual)</b>\n\n` +
+      `အနည်းဆုံးထိုးငွေ: <b>${this.MIN_BET.toLocaleString()} MMK</b>\n` +
+      `----------------------------------\n` +
+      `<b>၁။ အခြေခံရိုက်နည်း</b>\n` +
+      `• တစ်လုံးချင်း: <code>12-1000</code>\n` +
+      `• အများကြီးစုရိုက်: <code>12.45,78-500</code>\n` +
+      `• အာ (Reverse): <code>12r-1000</code>\n\n` +
+      `<b>၂။ အုပ်စုလိုက်အတိုကောက်များ</b>\n` +
+      `• အပူး ၁၀ လုံး: <code>pue-500</code>\n` +
+      `• ပါဝါ ၁၀ လုံး: <code>pow-500</code>\n` +
+      `• နက္ခတ် ၁၀ လုံး: <code>nat-500</code>\n\n` +
+      `<b>၃။ ထိပ်စီးနှင့် နောက်ပိတ်</b>\n` +
+      `• ထိပ်စီး (ဥပမာ-၁ ထိပ်): <code>1h-1000</code>\n` +
+      `• နောက်ပိတ် (ဥပမာ-၅ ပိတ်): <code>5n-500</code>\n\n` +
+      `<b>၄။ အစုံရောရိုက်နည်း (Advanced)</b>\n` +
+      `• <code>12.45r.pue.1h-1000</code>\n` +
+      `----------------------------------\n` +
+      `✍️ <i>အထက်ပါ format အတိုင်း ရိုက်ထည့်ပေးပါ။</i>`;
 
-    await ctx.reply(
-      `🎰 <b>2D ထိုးမည်</b>\n\n` +
-        `• အနည်းဆုံးထိုးငွေ: <b>${this.MIN_BET} MMK</b>\n` +
-        `• ရိုက်နည်း: <code>12.13-1000</code>, <code>pue-500</code>`,
-      {
-        parse_mode: 'HTML',
-        ...Markup.keyboard([['🏠 ပင်မစာမျက်နှာ']]).resize(),
-      },
-    );
+    await ctx.reply(manual, {
+      parse_mode: 'HTML',
+      ...Markup.keyboard([['🏠 ပင်မစာမျက်နှာ']]).resize(),
+    });
   }
 
   @On('text')
