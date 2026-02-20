@@ -35,10 +35,10 @@ export class TwoDScene {
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
     const { isOpen, message } = this.getSessionInfo();
-    // if (!isOpen) {
-    //   await ctx.reply(message);
-    //   return ctx.scene.leave();
-    // }
+    if (!isOpen) {
+      await ctx.reply(message);
+      return ctx.scene.leave();
+    }
     const manual =
       `🎰 <b>2D ထိုးသားလက်စွဲ (Reseller Manual)</b>\n\n` +
       `အနည်းဆုံးထိုးငွေ: <b>${this.MIN_BET.toLocaleString()} MMK</b>\n` +
@@ -171,8 +171,8 @@ export class TwoDScene {
   @Action('confirm_bet')
   async handleConfirm(@Ctx() ctx: BotContext) {
     const { isOpen, session } = this.getSessionInfo();
-    // if (!isOpen)
-    //   return ctx.answerCbQuery('⚠️ ပိတ်သွားပါပြီ', { show_alert: true });
+    if (!isOpen)
+      return ctx.answerCbQuery('⚠️ ပိတ်သွားပါပြီ', { show_alert: true });
 
     const state = ctx.scene.state as any;
     const tid = BigInt(ctx.from!.id);
