@@ -383,6 +383,89 @@ export class AdminController {
     );
   }
 
+  @Post('deduct-balance')
+  async deductBalance(
+    @Body() body: { userId: number; amount: number; reason: string },
+  ) {
+    const { userId, amount, reason } = body;
+
+    // ၁။ Validation
+    if (!userId || !amount || amount <= 0) {
+      throw new BadRequestException(
+        'User ID နှင့် မှန်ကန်သော ပမာဏ လိုအပ်ပါသည်',
+      );
+    }
+
+    try {
+      // ၂။ Database Transaction (Balance နှုတ်ခြင်း နှင့် မှတ်တမ်းသွင်းခြင်း)
+      const result = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({ where: { id: userId } });
+
+        if (!user) throw new NotFoundException('User ရှာမတွေ့ပါ');
+        if (Number(user.balance) < amount) {
+          throw new BadRequestException(
+            'User တွင် နှုတ်ရန် လက်ကျန်ငွေ မလုံလောက်ပါ',
+          );
+        }
+
+        // Balance ကို နှုတ်သည်
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { balance: { decrement: amount } },
+        });
+
+        // Transaction Table တွင် မှတ်တမ်းသွင်းသည်
+        await tx.transaction.create({
+          data: {
+            userId: userId,
+            amount: amount,
+            type: 'PURCHASE', // သင့် Enum ရှိ PURCHASE ကို သုံးထားသည်
+            description: `Admin Manual Deduct: ${reason}`,
+          },
+        });
+
+        return updatedUser;
+      });
+
+      // ၃။ User ထံသို့ Telegram Notification ပို့ခြင်း
+      try {
+        const message =
+          `💸 <b>သင့်အကောင့်မှ ငွေနှုတ်ယူခြင်း ခံရပါသည်</b>\n\n` +
+          `💰 နှုတ်ယူသည့် ပမာဏ: <b>${amount.toLocaleString()} MMK</b>\n` +
+          `📝 အကြောင်းပြချက်: <b>${reason}</b>\n` +
+          `💵 လက်ကျန်ငွေ: <b>${Number(result.balance).toLocaleString()} MMK</b>`;
+
+        await this.bot.telegram.sendMessage(
+          result.telegramId.toString(),
+          message,
+          {
+            parse_mode: 'HTML',
+          },
+        );
+      } catch (tgError: any) {
+        console.error(
+          'Failed to send deduction notification:',
+          tgError.message,
+        );
+      }
+
+      return {
+        success: true,
+        message: 'Balance deducted successfully',
+        newBalance: result.balance.toString(),
+      };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      console.error('Deduct Balance Error:', error);
+      throw new InternalServerErrorException('ငွေနှုတ်ယူမှု လုပ်ဆောင်၍မရပါ');
+    }
+  }
+
   @Post('update-settings')
   async updateSettings(
     @Body()
