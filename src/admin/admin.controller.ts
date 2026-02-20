@@ -166,10 +166,51 @@ export class AdminController {
   }
 
   @Get('users')
-  async getAllUsers() {
-    return this.prisma.user.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async getAllUsers(
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '10',
+    @Query('search') search?: string, // ရှာဖွေလိုပါက search ပါ ထည့်ပေးထားသည်
+  ) {
+    const p = Math.max(1, parseInt(page) || 1);
+    const l = Math.max(1, parseInt(limit) || 10);
+    const skip = (p - 1) * l;
+
+    // Search query logic (Optional: Username သို့မဟုတ် ID ဖြင့် ရှာရန်)
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        // BigInt ဖြစ်တဲ့အတွက် telegramId ကို string နဲ့ ရှာချင်ရင် ရှာလို့မရတာမျိုး ရှိနိုင်လို့ name ကိုပဲ ဦးစားပေးထားပါတယ်
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where: whereClause,
+        skip,
+        take: l,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({ where: whereClause }),
+    ]);
+
+    // BigInt များကို String သို့ ပြောင်းလဲခြင်း
+    const formattedUsers = users.map((user) => ({
+      ...user,
+      telegramId: user.telegramId.toString(),
+      balance: user.balance.toString(),
+    }));
+
+    return {
+      data: formattedUsers,
+      meta: {
+        total,
+        page: p,
+        lastPage: Math.ceil(total / l) || 1,
+        limit: l,
+      },
+    };
   }
 
   @Post('toggle-topup')
