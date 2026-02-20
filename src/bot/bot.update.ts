@@ -33,6 +33,7 @@ export const GAME_KEYBOARD = Markup.keyboard([
 @UseFilters(TelegrafExceptionFilter)
 export class BotUpdate {
   private readonly CHANNEL_ID = '-1002052753323';
+  private readonly CHANNEL_USERNAME = 'gmae_gear_mm';
   private readonly BONUS_AMOUNT = 3000;
   constructor(
     @InjectBot() private readonly bot: Telegraf<BotContext>,
@@ -64,7 +65,7 @@ export class BotUpdate {
           [
             Markup.button.url(
               '📢 Channel ကို Join ရန်',
-              `https://t.me/${this.CHANNEL_ID.replace('@', '')}`,
+              `https://t.me/${this.CHANNEL_USERNAME}`,
             ),
           ],
           [
