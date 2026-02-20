@@ -32,7 +32,7 @@ export const GAME_KEYBOARD = Markup.keyboard([
 @Update()
 @UseFilters(TelegrafExceptionFilter)
 export class BotUpdate {
-  private readonly CHANNEL_ID = '@your_channel_id';
+  private readonly CHANNEL_ID = '@Prototype004905';
   private readonly BONUS_AMOUNT = 3000;
   constructor(
     @InjectBot() private readonly bot: Telegraf<BotContext>,
@@ -50,13 +50,110 @@ export class BotUpdate {
       ctx.from.username,
     );
 
-    // Use HTML tags <b> instead of Markdown **
-    const welcomeText = `👋 <b>Welcome ${user.firstName}!</b>\n\n💰လူကြီးမင်းရဲ့ လက်ရှိလက်ကျန်ငွေ: <b>${user.balance}MMK</b> ဖြစ်ပါတယ်`;
+    // ၁။ Bonus မယူရသေးသူများကို အရင်စစ်မယ်
+    if (!user.welcomeBonusClaimed) {
+      const welcomeText =
+        `👋 <b>Welcome ${user.firstName}!</b>\n\n` +
+        `🎁 လူကြီးမင်းအတွက် အထူးလက်ဆောင်ရှိပါတယ်!\n` +
+        `ကျွန်ုပ်တို့၏ Channel ကို Join ထားရုံဖြင့် <b>${this.BONUS_AMOUNT} MMK</b> ကို Bonus အဖြစ် အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
+        `အောက်ပါ Channel ကို Join ပြီးနောက် "Bonus ယူမည်" ခလုတ်ကို နှိပ်ပေးပါခင်ဗျာ။`;
 
+      return await ctx.reply(welcomeText, {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [
+            Markup.button.url(
+              '📢 Channel ကို Join ရန်',
+              `https://t.me/${this.CHANNEL_ID.replace('@', '')}`,
+            ),
+          ],
+          [
+            Markup.button.callback(
+              '✅ Join ပြီးပါပြီ (Bonus ယူမည်)',
+              'verify_bonus',
+            ),
+          ],
+        ]),
+      });
+    }
+
+    // ၂။ Bonus ယူပြီးသားသူဆိုရင် ပုံမှန်အတိုင်း ပြမယ်
+    const welcomeText = `👋 <b>Welcome back ${user.firstName}!</b>\n\n💰 လက်ရှိလက်ကျန်ငွေ: <b>${user.balance} MMK</b>`;
     await ctx.reply(welcomeText, {
-      parse_mode: 'HTML', // Change this from 'Markdown' to 'HTML'
+      parse_mode: 'HTML',
       ...MAIN_KEYBOARD,
     });
+  }
+
+  @Action('verify_bonus')
+  async onVerifyBonus(@Ctx() ctx: BotContext) {
+    const telegramId = ctx.from.id;
+
+    try {
+      // ၁။ Channel ထဲမှာ တကယ်ရှိမရှိ စစ်ဆေးခြင်း
+      const chatMember = await ctx.telegram.getChatMember(
+        this.CHANNEL_ID,
+        telegramId,
+      );
+      const isMember = ['member', 'administrator', 'creator'].includes(
+        chatMember.status,
+      );
+
+      if (!isMember) {
+        return await ctx.answerCbQuery(
+          '⚠️ လူကြီးမင်း Channel ကို Join ရန် လိုအပ်နေပါသေးတယ်ခင်ဗျာ။',
+          { show_alert: true },
+        );
+      }
+
+      // ၂။ DB မှာ Bonus အခြေအနေကို တစ်ခါပြန်စစ်မယ် (Double Check)
+      const user = await this.prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) },
+      });
+
+      if (user.welcomeBonusClaimed) {
+        return await ctx.answerCbQuery(
+          '❌ သင်သည် Bonus ထုတ်ယူပြီးသား ဖြစ်ပါသည်။',
+          { show_alert: true },
+        );
+      }
+
+      // ၃။ ပိုက်ဆံဖြည့်ပေးခြင်းနှင့် Flag မှတ်သားခြင်း
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { telegramId: BigInt(telegramId) },
+          data: {
+            balance: { increment: this.BONUS_AMOUNT },
+            welcomeBonusClaimed: true,
+          },
+        }),
+        this.prisma.transaction.create({
+          data: {
+            userId: user.id,
+            amount: this.BONUS_AMOUNT,
+            type: 'DEPOSIT',
+            description: '🎁 Welcome Bonus (Join Channel)',
+          },
+        }),
+      ]);
+
+      // ၄။ အောင်မြင်ကြောင်း အကြောင်းကြားစာ
+      await ctx.deleteMessage(); // Join ခိုင်းတဲ့ message ကို ဖျက်မယ်
+      await ctx.reply(
+        `🎉 <b>ဂုဏ်ယူပါတယ်!</b>\n\nChannel Join တဲ့အတွက် လက်ဆောင် <b>${this.BONUS_AMOUNT} MMK</b> ကို လူကြီးမင်းအကောင့်ထဲ ထည့်သွင်းပေးလိုက်ပါပြီ။`,
+        {
+          parse_mode: 'HTML',
+          ...MAIN_KEYBOARD,
+        },
+      );
+
+      await ctx.answerCbQuery('Bonus Claimed Successfully!');
+    } catch (error) {
+      console.error('Verify Bonus Error:', error);
+      await ctx.answerCbQuery(
+        'ခေတ္တခဏ အမှားအယွင်းရှိနေပါသည်။ နောက်မှ ထပ်မံကြိုးစားပေးပါ။',
+      );
+    }
   }
 
   @On('channel_post')
@@ -68,10 +165,10 @@ export class BotUpdate {
     console.log('---------------------------------');
   }
 
-  @On('message')
-  async onMessage(@Ctx() ctx: any) {
-    console.log('Chat ID is:', ctx.chat.id); // ဒီကောင်က Channel ID ကို ထုတ်ပြပေးမှာပါ
-  }
+  // @On('message')
+  // async onMessage(@Ctx() ctx: any) {
+  //   console.log('Chat ID is:', ctx.chat.id); // ဒီကောင်က Channel ID ကို ထုတ်ပြပေးမှာပါ
+  // }
 
   @Command('balance')
   @Hears('💰 လက်ကျန်ငွေ')
