@@ -59,7 +59,7 @@ export class BotUpdate {
         `ကျွန်ုပ်တို့၏ Channel ကို Join ထားရုံဖြင့် <b>${this.BONUS_AMOUNT} MMK</b> ကို Bonus အဖြစ် အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
         `အောက်ပါ Channel ကို Join ပြီးနောက် "Bonus ယူမည်" ခလုတ်ကို နှိပ်ပေးပါခင်ဗျာ။`;
 
-      return await ctx.reply(welcomeText, {
+      await ctx.reply(welcomeText, {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [
@@ -76,6 +76,7 @@ export class BotUpdate {
           ],
         ]),
       });
+      return;
     }
 
     // ၂။ Bonus ယူပြီးသားသူဆိုရင် ပုံမှန်အတိုင်း ပြမယ်
