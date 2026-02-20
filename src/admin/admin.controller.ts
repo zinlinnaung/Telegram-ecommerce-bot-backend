@@ -573,6 +573,81 @@ export class AdminController {
     }
   }
 
+  @Post('add-balance')
+  async addBalance(
+    @Body() body: { userId: number; amount: number; reason: string },
+  ) {
+    const { userId, amount, reason } = body;
+
+    // ၁။ Validation
+    if (!userId || !amount || amount <= 0) {
+      throw new BadRequestException(
+        'User ID နှင့် မှန်ကန်သော ပမာဏ လိုအပ်ပါသည်',
+      );
+    }
+
+    try {
+      // ၂။ Database Transaction (Balance ပေါင်းခြင်း နှင့် မှတ်တမ်းသွင်းခြင်း)
+      const result = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({ where: { id: userId } });
+
+        if (!user) throw new NotFoundException('User ရှာမတွေ့ပါ');
+
+        // Balance ကို တိုးမြှင့်သည်
+        const updatedUser = await tx.user.update({
+          where: { id: userId },
+          data: { balance: { increment: amount } },
+        });
+
+        // Transaction Table တွင် မှတ်တမ်းသွင်းသည် (DEPOSIT type ကို သုံးထားသည်)
+        await tx.transaction.create({
+          data: {
+            userId: userId,
+            amount: amount,
+            type: 'DEPOSIT',
+            description: `Admin Manual Deposit: ${reason || 'No reason provided'}`,
+          },
+        });
+
+        return updatedUser;
+      });
+
+      // ၃။ User ထံသို့ Telegram Notification ပို့ခြင်း
+      try {
+        const message =
+          `✅ <b>သင့်အကောင့်ထဲသို့ ငွေဖြည့်သွင်းမှု အောင်မြင်ပါသည်</b>\n\n` +
+          `💰 ဖြည့်သွင်းသည့် ပမာဏ: <b>${amount.toLocaleString()} MMK</b>\n` +
+          `📝 မှတ်ချက်: <b>${reason || 'Admin Manual Deposit'}</b>\n` +
+          `💵 လက်ရှိလက်ကျန်ငွေ: <b>${Number(result.balance).toLocaleString()} MMK</b>`;
+
+        await this.bot.telegram.sendMessage(
+          result.telegramId.toString(),
+          message,
+          {
+            parse_mode: 'HTML',
+          },
+        );
+      } catch (tgError: any) {
+        console.error('Failed to send deposit notification:', tgError.message);
+      }
+
+      return {
+        success: true,
+        message: 'Balance added successfully',
+        newBalance: result.balance.toString(),
+      };
+    } catch (error) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
+        throw error;
+      }
+      console.error('Add Balance Error:', error);
+      throw new InternalServerErrorException('ငွေဖြည့်သွင်းမှု လုပ်ဆောင်၍မရပါ');
+    }
+  }
+
   @Post('update-settings')
   async updateSettings(
     @Body()
