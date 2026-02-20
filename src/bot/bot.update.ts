@@ -34,7 +34,7 @@ export const GAME_KEYBOARD = Markup.keyboard([
 export class BotUpdate {
   private readonly CHANNEL_ID = '-1002052753323';
   private readonly CHANNEL_USERNAME = 'game_gear_mm';
-  private readonly BONUS_AMOUNT = 3000;
+  private readonly BONUS_AMOUNT = 1000;
   constructor(
     @InjectBot() private readonly bot: Telegraf<BotContext>,
     private readonly usersService: UsersService,

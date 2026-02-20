@@ -18,6 +18,26 @@ export class WithdrawScene {
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
+    // ပထမဆုံး အသုံးပြုသူက ငွေသွင်းဖူးသလားဆိုတာကို အရင်စစ်ဆေးမယ်
+    const dbUser = await this.prisma.user.findUnique({
+      where: { telegramId: BigInt(ctx.from.id) },
+      include: {
+        deposits: {
+          where: { status: 'APPROVED' }, // Approved ဖြစ်သွားတဲ့ deposit ရှိမရှိ စစ်မယ်
+        },
+      },
+    });
+
+    // အကယ်၍ Approved ဖြစ်ထားတဲ့ Deposit တစ်ခုမှ မရှိခဲ့ရင်
+    if (!dbUser || dbUser.deposits.length === 0) {
+      await ctx.reply(
+        '⚠️ <b>ငွေထုတ်ယူရန် ငြင်းပယ်ခံရသည်</b>\n\n' +
+          'လူကြီးမင်းအနေဖြင့် ငွေထုတ်ယူနိုင်ရန်အတွက် အနည်းဆုံး တစ်ကြိမ် ငွေဖြည့်သွင်းထားရန် လိုအပ်ပါသည်ခင်ဗျာ။',
+        { parse_mode: 'HTML', ...MAIN_KEYBOARD },
+      );
+      return ctx.scene.leave(); // Scene ထဲကနေ ပြန်ထွက်သွားမယ်
+    }
+
     await ctx.reply(
       '💸 <b>ငွေထုတ်ယူခြင်း</b>\n\nထုတ်ယူလိုသော ပမာဏကို ရိုက်ထည့်ပါ (အနည်းဆုံး 10000 ကျပ်)',
       { parse_mode: 'HTML', ...Markup.keyboard([['❌ ပယ်ဖျက်မည်']]).resize() },
