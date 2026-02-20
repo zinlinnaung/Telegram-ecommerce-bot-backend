@@ -49,13 +49,7 @@ export class BotUpdate {
 
     await ctx.reply(welcomeText, {
       parse_mode: 'HTML', // Change this from 'Markdown' to 'HTML'
-      ...Markup.keyboard([
-        ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
-        ['🎲 အနိမ့်/အမြင့်', '🛒 စျေးဝယ်မယ်'],
-        ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
-        ['📝 ထိုးမှတ်တမ်း', '💸 ငွေထုတ်မယ်'],
-        ['📞 အကူအညီ'],
-      ]).resize(),
+      ...MAIN_KEYBOARD,
     });
   }
 
