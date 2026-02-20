@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "commission" DECIMAL(65,30) NOT NULL DEFAULT 15.0,
+ADD COLUMN     "isReseller" BOOLEAN NOT NULL DEFAULT false;

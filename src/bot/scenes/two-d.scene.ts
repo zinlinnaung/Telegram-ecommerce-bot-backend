@@ -6,64 +6,44 @@ import { MAIN_KEYBOARD } from '../bot.update';
 
 @Scene('scene_2d')
 export class TwoDScene {
-  private readonly MIN_BET = 500;
-  private readonly GLOBAL_LIMIT_PER_NUMBER = 500000; // တစ်လုံးကို အများဆုံး ၅ သိန်း MMK
-  private readonly BLOCKED_NUMBERS = ['00', '99', '11']; // ပိတ်ဂဏန်းများ
+  private readonly MIN_BET = 500; // <--- အနည်းဆုံးထိုးငွေ သတ်မှတ်ချက်
+  private readonly GLOBAL_LIMIT_PER_NUMBER = 500000;
+  private readonly BLOCKED_NUMBERS = ['00', '99'];
 
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Real-world 2D Session Logic
-   * နံနက်ပိုင်း: 08:00 AM မှ 11:55 AM ထိ
-   * ညနေပိုင်း: 01:00 PM မှ 04:25 PM ထိ
-   */
   private getSessionInfo() {
-    const now = new Date();
     const mmTime = new Date(
-      now.toLocaleString('en-US', { timeZone: 'Asia/Yangon' }),
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Yangon' }),
     );
     const hour = mmTime.getHours();
     const min = mmTime.getMinutes();
     const currentTime = hour * 100 + min;
 
-    // Morning Session (08:00 - 11:55)
-    if (currentTime >= 800 && currentTime < 1155) {
-      return { isOpen: true, session: 'MORNING' as const, message: '' };
-    }
+    if (currentTime >= 800 && currentTime < 1155)
+      return { isOpen: true, session: 'MORNING' as const };
+    if (currentTime >= 1300 && currentTime < 1625)
+      return { isOpen: true, session: 'EVENING' as const };
 
-    // Evening Session (13:00 - 16:25)
-    if (currentTime >= 1300 && currentTime < 1625) {
-      return { isOpen: true, session: 'EVENING' as const, message: '' };
-    }
-
-    // Closed Status & Informative Messages
-    let message = '⚠️ လက်ရှိ 2D ထိုးချိန် မဟုတ်သေးပါ။';
-    if (currentTime >= 1155 && currentTime < 1300) {
-      message =
-        '⚠️ 2D နံနက်ပိုင်း ပိတ်သွားပါပြီ။ နေ့လယ် ၁:၀၀ နာရီတွင် ညနေပိုင်းအတွက် ပြန်ဖွင့်ပါမည်။';
-    } else if (currentTime >= 1625) {
-      message =
-        '⚠️ 2D ယနေ့အတွက် ပိတ်သွားပါပြီ။ မနက်ဖြန် နံနက် ၈:၀၀ နာရီတွင် ပြန်ဖွင့်ပါမည်။';
-    } else if (currentTime < 800) {
-      message = '⚠️ 2D နံနက် ၈:၀၀ နာရီမှသာ စတင်ဖွင့်လှစ်ပါမည်။';
-    }
-
-    return { isOpen: false, session: null, message };
+    return {
+      isOpen: false,
+      session: null,
+      message: '⚠️ လက်ရှိ 2D ပိတ်ထားပါသည်။',
+    };
   }
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
     const { isOpen, message } = this.getSessionInfo();
-
     if (!isOpen) {
       await ctx.reply(message);
       return ctx.scene.leave();
     }
 
     await ctx.reply(
-      '🎰 <b>2D ထိုးမည်</b>\n\n' +
-        '• ဂဏန်းခွဲရိုက်ပါ (e.g., 12-2000 45r-1000)\n' +
-        '• တစ်ကွက်ချင်းစီအတွက် Limit ရှိနိုင်ပါသည်။',
+      `🎰 <b>2D ထိုးမည်</b>\n\n` +
+        `• အနည်းဆုံးထိုးငွေ: <b>${this.MIN_BET} MMK</b>\n` +
+        `• ရိုက်နည်း: <code>12.13-1000</code>, <code>pue-500</code>`,
       {
         parse_mode: 'HTML',
         ...Markup.keyboard([['🏠 ပင်မစာမျက်နှာ']]).resize(),
@@ -73,139 +53,100 @@ export class TwoDScene {
 
   @On('text')
   async onText(@Ctx() ctx: BotContext) {
-    const { isOpen, message } = this.getSessionInfo();
-    if (!isOpen) {
-      await ctx.reply(message);
-      return ctx.scene.leave();
-    }
-
     const input = (ctx.message as any).text.trim().toLowerCase();
-    const state = ctx.scene.state as any;
-
-    // Exit Logic
     if (input === '🏠 ပင်မစာမျက်နှာ' || input === 'exit') {
       await ctx.scene.leave();
-      await ctx.reply('🏠 ပင်မစာမျက်နှာသို့ ပြန်ရောက်ပါပြီ။', {
-        parse_mode: 'HTML',
-        ...MAIN_KEYBOARD,
-      });
-      return;
+      return ctx.reply('🏠 ပြန်ရောက်ပါပြီ။', MAIN_KEYBOARD);
     }
 
-    // Parsing Input
-    if (!state.betEntries) {
-      const parts = input.split(/[\s,]+/);
-      const entries: { number: string; amount?: number }[] = [];
+    const entries = this.parseInput(input);
+    if (entries.length === 0)
+      return ctx.reply('❌ ပုံစံမှားနေပါသည်။ (e.g. 12.45r-1000)');
 
-      for (const part of parts) {
-        const [rawNum, rawAmount] = part.split(/[-/]/);
-        const amount = rawAmount ? parseInt(rawAmount) : undefined;
-        const numOnly = rawNum.replace('r', '');
-
-        // 1. Block List Check
-        if (this.BLOCKED_NUMBERS.includes(numOnly)) {
-          await ctx.reply(
-            `❌ ဂဏန်း <b>${numOnly}</b> သည် ယနေ့အတွက် ပိတ်ထားပါသည်။`,
-            { parse_mode: 'HTML' },
-          );
-          return;
-        }
-
-        // 2. Limit Check
-        if (amount !== undefined) {
-          if (amount < this.MIN_BET) {
-            await ctx.reply(`❌ အနည်းဆုံး ${this.MIN_BET} ကျပ် ဖြစ်ရပါမည်။`);
-            return;
-          }
-          if (amount > this.GLOBAL_LIMIT_PER_NUMBER) {
-            await ctx.reply(
-              `❌ အများဆုံး ${this.GLOBAL_LIMIT_PER_NUMBER.toLocaleString()} MMK သာ ထိုးနိုင်ပါသည်။`,
-            );
-            return;
-          }
-        }
-
-        // 3. R (Reverse) Logic
-        if (rawNum.endsWith('r')) {
-          const num = rawNum.replace('r', '');
-          const rev = num.split('').reverse().join('');
-          entries.push({ number: num, amount });
-          if (num !== rev) entries.push({ number: rev, amount });
-        } else if (/^\d{2}$/.test(rawNum)) {
-          entries.push({ number: rawNum, amount });
-        }
+    // ၁။ MIN_BET စစ်ဆေးခြင်း
+    for (const entry of entries) {
+      if (entry.amount < this.MIN_BET) {
+        return ctx.reply(
+          `❌ အနည်းဆုံး <b>${this.MIN_BET.toLocaleString()} MMK</b> ထိုးရပါမည်။\n(သင်ရိုက်ခဲ့သည် - ${entry.number} ကို ${entry.amount} ကျပ်)`,
+          { parse_mode: 'HTML' },
+        );
       }
-
-      if (entries.length === 0) {
-        return ctx.reply('❌ ဂဏန်းပုံစံ မှားယွင်းနေပါသည်။ (e.g., 12-1000)');
+      // ၂။ ပိတ်ဂဏန်းစစ်ဆေးခြင်း
+      if (this.BLOCKED_NUMBERS.includes(entry.number)) {
+        return ctx.reply(
+          `❌ <b>${entry.number}</b> သည် ယနေ့အတွက် ပိတ်ဂဏန်းဖြစ်ပါသည်။`,
+          { parse_mode: 'HTML' },
+        );
       }
-      state.betEntries = entries;
-    } else {
-      // Manual amount input if only numbers were provided initially
-      const amount = parseInt(input);
-      if (isNaN(amount) || amount < this.MIN_BET) {
-        return ctx.reply(`❌ အနည်းဆုံး ${this.MIN_BET} ကျပ် ရိုက်ပါ။`);
-      }
-      state.betEntries = state.betEntries.map((e: any) => ({
-        ...e,
-        amount: e.amount ?? amount,
-      }));
     }
 
-    const allHavePrice = state.betEntries.every(
-      (e: any) => e.amount !== undefined,
-    );
-    if (allHavePrice) return this.showConfirmation(ctx);
+    const state = ctx.scene.state as any;
+    state.betEntries = entries;
+    state.totalAmount = entries.reduce((sum, e) => sum + e.amount, 0);
 
-    await ctx.reply(
-      `🎯 ဂဏန်း: <b>${state.betEntries.map((e: any) => e.number).join(', ')}</b>\n\nမည်မျှဖိုး ထိုးမည်နည်း?`,
-      {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard([
-          [
-            Markup.button.callback('500', 'amt_500'),
-            Markup.button.callback('1000', 'amt_1000'),
-          ],
-          [
-            Markup.button.callback('5000', 'amt_5000'),
-            Markup.button.callback('10000', 'amt_10000'),
-          ],
-        ]),
-      },
-    );
+    return this.showConfirmation(ctx);
   }
 
-  @Action(/amt_(\d+)/)
-  async handleAmountAction(@Ctx() ctx: BotContext) {
-    const amount = parseInt((ctx as any).match[1]);
-    const state = ctx.scene.state as any;
+  private parseInput(input: string) {
+    const entries: { number: string; amount: number }[] = [];
+    const blocks = input.split(/[\s\n]+/);
 
-    state.betEntries = state.betEntries.map((e: any) => ({
-      ...e,
-      amount: e.amount ?? amount,
-    }));
-    await ctx.answerCbQuery();
-    return this.showConfirmation(ctx);
+    for (const block of blocks) {
+      const match = block.match(/^([a-z\d.,]+)[-/](\d+)$/);
+      if (!match) continue;
+
+      const rawNums = match[1].split(/[.,]/);
+      const amount = parseInt(match[2]);
+
+      for (let n of rawNums) {
+        if (n === 'pue') {
+          ['00', '11', '22', '33', '44', '55', '66', '77', '88', '99'].forEach(
+            (num) => entries.push({ number: num, amount }),
+          );
+        } else if (n === 'pow') {
+          ['05', '50', '16', '61', '27', '72', '38', '83', '49', '94'].forEach(
+            (num) => entries.push({ number: num, amount }),
+          );
+        } else if (n === 'nat') {
+          ['07', '70', '18', '81', '24', '42', '35', '53', '69', '96'].forEach(
+            (num) => entries.push({ number: num, amount }),
+          );
+        } else if (/^\dh$/.test(n)) {
+          for (let i = 0; i <= 9; i++)
+            entries.push({ number: n[0] + i, amount });
+        } else if (/^\dn$/.test(n)) {
+          for (let i = 0; i <= 9; i++)
+            entries.push({ number: i + n[0], amount });
+        } else if (n.endsWith('r')) {
+          const raw = n.replace('r', '');
+          const rev = raw.split('').reverse().join('');
+          entries.push({ number: raw, amount });
+          if (raw !== rev) entries.push({ number: rev, amount });
+        } else if (/^\d{2}$/.test(n)) {
+          entries.push({ number: n, amount });
+        }
+      }
+    }
+
+    const merged = new Map<string, number>();
+    entries.forEach((e) =>
+      merged.set(e.number, (merged.get(e.number) || 0) + e.amount),
+    );
+    return Array.from(merged, ([number, amount]) => ({ number, amount }));
   }
 
   private async showConfirmation(ctx: BotContext) {
     const state = ctx.scene.state as any;
-    let total = 0;
-    let summary = '';
-
-    state.betEntries.forEach((e: any) => {
-      total += e.amount;
-      summary += `• <b>${e.number}</b> 👉 ${e.amount.toLocaleString()} MMK\n`;
-    });
-    state.totalAmount = total;
-
+    const summary = state.betEntries
+      .map((e) => `• ${e.number} - ${e.amount.toLocaleString()}`)
+      .join('\n');
     await ctx.reply(
-      `📝 <b>ထိုးမည့်စာဉ်း အကျဉ်းချုပ်</b>\n\n${summary}\n💰 စုစုပေါင်း: <b>${total.toLocaleString()} MMK</b>\n\nအတည်ပြုပါသလား?`,
+      `📝 <b>အတည်ပြုရန်</b>\n\n${summary}\n\n💰 စုစုပေါင်း: <b>${state.totalAmount.toLocaleString()} MMK</b>`,
       {
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [Markup.button.callback('✅ အတည်ပြုမည်', 'confirm_bet')],
-          [Markup.button.callback('❌ ဖျက်သိမ်းမည်', 'cancel_bet')],
+          [Markup.button.callback('❌ ဖျက်မည်', 'cancel_bet')],
         ]),
       },
     );
@@ -214,92 +155,91 @@ export class TwoDScene {
   @Action('confirm_bet')
   async handleConfirm(@Ctx() ctx: BotContext) {
     const { isOpen, session } = this.getSessionInfo();
-    if (!isOpen) {
-      await ctx.answerCbQuery('⚠️ ဆောရီး၊ ပိတ်သွားပါပြီ။', {
-        show_alert: true,
-      });
-      return ctx.scene.leave();
-    }
-    await ctx.answerCbQuery('Stock စစ်ဆေးနေပါသည်...');
-    return this.processFinalBet(ctx, session!);
-  }
+    if (!isOpen)
+      return ctx.answerCbQuery('⚠️ ပိတ်သွားပါပြီ', { show_alert: true });
 
-  @Action('cancel_bet')
-  async handleCancel(@Ctx() ctx: BotContext) {
-    await ctx.answerCbQuery();
-    await ctx.editMessageText('❌ ဖျက်သိမ်းလိုက်ပါသည်။');
+    const state = ctx.scene.state as any;
+    const tid = BigInt(ctx.from!.id);
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({ where: { telegramId: tid } });
+        if (!user) throw new Error('USER_NOT_FOUND');
+
+        let netAmount = state.totalAmount;
+        let commPercentage = 0;
+
+        if (user.isReseller) {
+          commPercentage = Number(user.commission || 15);
+          netAmount = state.totalAmount * (1 - commPercentage / 100);
+        }
+
+        if (Number(user.balance) < netAmount) throw new Error('LOW_BALANCE');
+
+        for (const bet of state.betEntries) {
+          const stats = await tx.bet.aggregate({
+            where: {
+              number: bet.number,
+              session,
+              type: '2D',
+              createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
+            },
+            _sum: { amount: true },
+          });
+          if (
+            Number(stats._sum.amount || 0) + bet.amount >
+            this.GLOBAL_LIMIT_PER_NUMBER
+          )
+            throw new Error(`LIMIT:${bet.number}`);
+        }
+
+        await tx.user.update({
+          where: { id: user.id },
+          data: { balance: { decrement: netAmount } },
+        });
+        await tx.bet.createMany({
+          data: state.betEntries.map((e) => ({
+            userId: user.id,
+            type: '2D',
+            number: e.number,
+            amount: e.amount,
+            session,
+          })),
+        });
+        await tx.transaction.create({
+          data: {
+            userId: user.id,
+            amount: netAmount,
+            type: 'PURCHASE',
+            description: user.isReseller
+              ? `2D Reseller (${commPercentage}%)`
+              : `2D Regular`,
+          },
+        });
+
+        await ctx.editMessageText(
+          `✅ <b>အောင်မြင်ပါသည်။</b>\n\n📅 Date: ${new Date().toLocaleDateString()}\n🕒 Session: ${session}\n💰 Total: ${state.totalAmount.toLocaleString()} MMK` +
+            (user.isReseller
+              ? `\n📉 Net Paid: ${netAmount.toLocaleString()}`
+              : ''),
+          { parse_mode: 'HTML' },
+        );
+      });
+    } catch (e: any) {
+      const msg = e.message.startsWith('LIMIT:')
+        ? `❌ ဂဏန်း ${e.message.split(':')[1]} Limit ပြည့်ပါပြီ`
+        : e.message === 'LOW_BALANCE'
+          ? '❌ လက်ကျန်ငွေ မလုံလောက်ပါ'
+          : '❌ အမှားအယွင်းရှိပါသည်';
+      await ctx.reply(msg);
+    }
     return ctx.scene.leave();
   }
 
-  private async processFinalBet(
-    ctx: BotContext,
-    session: 'MORNING' | 'EVENING',
-  ) {
-    const state = ctx.scene.state as any;
-
-    try {
-      // 1. Stock Check
-      for (const bet of state.betEntries) {
-        const currentTotal = await this.prisma.bet.aggregate({
-          where: {
-            number: bet.number,
-            session,
-            type: '2D',
-            createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
-          },
-          _sum: { amount: true },
-        });
-
-        const alreadyBet = Number(currentTotal._sum.amount || 0);
-        if (alreadyBet + bet.amount > this.GLOBAL_LIMIT_PER_NUMBER) {
-          const available = this.GLOBAL_LIMIT_PER_NUMBER - alreadyBet;
-          delete state.betEntries;
-          return ctx.reply(
-            `❌ ဂဏန်း <b>${bet.number}</b> မှာ Limit ပြည့်သွားပါပြီ။\nလက်ကျန် Stock: <b>${available > 0 ? available : 0}</b> MMK သာ ရှိပါတော့သည်။`,
-            { parse_mode: 'HTML' },
-          );
-        }
-      }
-
-      // 2. Balance Check
-      const dbUser = await this.prisma.user.findUnique({
-        where: { telegramId: BigInt(ctx.from!.id) },
-      });
-
-      if (!dbUser || Number(dbUser.balance) < state.totalAmount) {
-        return ctx.reply('❌ လက်ကျန်ငွေ မလုံလောက်ပါ။');
-      }
-
-      // 3. Transactional Update
-      await this.prisma.$transaction(async (tx) => {
-        // Increment Balance
-        await tx.user.update({
-          where: { id: dbUser.id },
-          data: { balance: { decrement: state.totalAmount } },
-        });
-
-        // Create Bets
-        for (const bet of state.betEntries) {
-          await tx.bet.create({
-            data: {
-              userId: dbUser.id,
-              type: '2D',
-              number: bet.number,
-              amount: bet.amount,
-              session: session,
-            },
-          });
-        }
-      });
-
-      await ctx.editMessageText(
-        `✅ <b>အောင်မြင်ပါသည်။</b>\nSession: ${session}\nစုစုပေါင်း: ${state.totalAmount.toLocaleString()} MMK`,
-        { parse_mode: 'HTML' },
-      );
-    } catch (e) {
-      console.error(e);
-      await ctx.reply('❌ စနစ်ချို့ယွင်းချက် ဖြစ်ပေါ်ခဲ့ပါသည်။');
-    }
+  @Action('cancel_bet')
+  async onCancel(@Ctx() ctx: BotContext) {
+    await ctx.answerCbQuery();
+    await ctx.editMessageText('❌ ပယ်ဖျက်လိုက်ပါသည်။');
     return ctx.scene.leave();
   }
 }

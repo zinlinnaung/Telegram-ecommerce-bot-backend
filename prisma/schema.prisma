@@ -27,6 +27,8 @@ model User {
   firstName           String?
   balance             Decimal       @default(0.0) @db.Decimal(10, 2)
   welcomeBonusClaimed Boolean       @default(false)
+  isReseller          Boolean       @default(false)
+  commission          Decimal       @default(15.0) // ဥပမာ - ၁၅% ကော်မရှင် (၁၀၀၀ ဖိုးထိုးရင် ၈၅၀ ပဲ နှုတ်မယ်)
   createdAt           DateTime      @default(now())
   transactions        Transaction[]
   deposits            Deposit[]
