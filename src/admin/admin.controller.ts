@@ -243,6 +243,67 @@ export class AdminController {
     };
   }
 
+  @Post('make-reseller')
+  async makeReseller(@Body() body: { userId: number; commission: number }) {
+    const { userId, commission } = body;
+
+    // ၁။ Validation
+    if (!userId || commission === undefined) {
+      throw new BadRequestException(
+        'User ID နှင့် Commission နှုန်း လိုအပ်ပါသည်',
+      );
+    }
+
+    try {
+      // ၂။ Database တွင် Update လုပ်ခြင်း
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          isReseller: true,
+          commission: commission,
+        },
+      });
+
+      // ၃။ User ထံသို့ Telegram Notification ပို့ခြင်း
+      try {
+        const message =
+          `🎉 <b>ဂုဏ်ယူပါတယ်!</b>\n\n` +
+          `လူကြီးမင်း၏ အကောင့်ကို <b>Reseller (ကိုယ်စားလှယ်)</b> အဖြစ် အဆင့်မြှင့်တင်ပြီးပါပြီ။\n` +
+          `📉 သင်ရရှိမည့် ကော်မရှင်နှုန်း: <b>${commission}%</b>\n\n` +
+          `ယခုမှစ၍ 2D/3D ထိုးရာတွင် ${commission}% လျှော့စျေးဖြင့် အလိုအလျောက် ဖြတ်တောက်ပေးသွားမည် ဖြစ်ပါသည်။`;
+
+        await this.bot.telegram.sendMessage(
+          user.telegramId.toString(),
+          message,
+          { parse_mode: 'HTML' },
+        );
+      } catch (tgError: any) {
+        console.error('Failed to send reseller notification:', tgError.message);
+      }
+
+      return {
+        success: true,
+        message: 'User is now a reseller',
+        isReseller: user.isReseller,
+        commission: user.commission,
+      };
+    } catch (error) {
+      console.error('Make Reseller Error:', error);
+      throw new InternalServerErrorException(
+        'Reseller အဖြစ် ပြောင်းလဲမှု မအောင်မြင်ပါ',
+      );
+    }
+  }
+
+  @Post('remove-reseller/:id')
+  async removeReseller(@Param('id', ParseIntPipe) id: number) {
+    await this.prisma.user.update({
+      where: { id },
+      data: { isReseller: false, commission: 0 },
+    });
+    return { success: true, message: 'Reseller status removed' };
+  }
+
   @Get('users/:id')
   async getUserDetails(@Param('id', ParseIntPipe) id: number) {
     const user = await this.prisma.user.findUnique({
