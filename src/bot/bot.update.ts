@@ -32,6 +32,8 @@ export const GAME_KEYBOARD = Markup.keyboard([
 @Update()
 @UseFilters(TelegrafExceptionFilter)
 export class BotUpdate {
+  private readonly CHANNEL_ID = '@your_channel_id';
+  private readonly BONUS_AMOUNT = 3000;
   constructor(
     @InjectBot() private readonly bot: Telegraf<BotContext>,
     private readonly usersService: UsersService,
@@ -66,10 +68,10 @@ export class BotUpdate {
     console.log('---------------------------------');
   }
 
-  // @On('message')
-  // async onMessage(@Ctx() ctx: any) {
-  //   console.log('Chat ID is:', ctx.chat.id); // ဒီကောင်က Channel ID ကို ထုတ်ပြပေးမှာပါ
-  // }
+  @On('message')
+  async onMessage(@Ctx() ctx: any) {
+    console.log('Chat ID is:', ctx.chat.id); // ဒီကောင်က Channel ID ကို ထုတ်ပြပေးမှာပါ
+  }
 
   @Command('balance')
   @Hears('💰 လက်ကျန်ငွေ')
