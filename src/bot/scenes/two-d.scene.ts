@@ -72,7 +72,8 @@ export class TwoDScene {
     const input = (ctx.message as any).text.trim().toLowerCase();
     if (input === '🏠 ပင်မစာမျက်နှာ' || input === 'exit') {
       await ctx.scene.leave();
-      return ctx.reply('🏠 ပြန်ရောက်ပါပြီ။', MAIN_KEYBOARD);
+      await ctx.reply('🏠 ပြန်ရောက်ပါပြီ။', MAIN_KEYBOARD);
+      return;
     }
 
     const entries = this.parseInput(input);
