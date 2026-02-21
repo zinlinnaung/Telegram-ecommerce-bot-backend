@@ -14,6 +14,8 @@ import {
   UploadedFile,
   InternalServerErrorException,
   Patch,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InjectBot } from 'nestjs-telegraf';
@@ -27,6 +29,7 @@ import { extname } from 'path';
 import { WalletService } from 'src/wallet/wallet.service';
 import { CreateDepositDto } from './dto/deposit.dto';
 import { SettingsService } from './settings.service';
+import axios from 'axios';
 
 @Controller('admin')
 export class AdminController {
@@ -789,6 +792,22 @@ export class AdminController {
         };
       }
     });
+  }
+
+  @Get('validate-mlbb')
+  async validateMLBB(
+    @Query('id') id: string,
+    @Query('serverid') serverid: string,
+  ) {
+    try {
+      const res = await axios.get(
+        `https://cekidml.caliph.dev/api/validasi?id=${id}&serverid=${serverid}`,
+        { timeout: 8000 },
+      );
+      return res.data;
+    } catch (error) {
+      throw new HttpException('API Error', HttpStatus.BAD_GATEWAY);
+    }
   }
 
   @Post('update-settings')
