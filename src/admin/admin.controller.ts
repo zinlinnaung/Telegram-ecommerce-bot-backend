@@ -26,6 +26,7 @@ import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import { WalletService } from 'src/wallet/wallet.service';
 import { CreateDepositDto } from './dto/deposit.dto';
+import { SettingsService } from './settings.service';
 
 @Controller('admin')
 export class AdminController {
@@ -34,6 +35,7 @@ export class AdminController {
     @InjectBot() private readonly bot: Telegraf<BotContext>,
     private readonly withdrawService: WithdrawService,
     private readonly walletService: WalletService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Get('dashboard-stats')
@@ -164,6 +166,24 @@ export class AdminController {
     return this.prisma.product.findMany({
       include: { keys: true },
     });
+  }
+
+  @Get('blocked-numbers')
+  getBlockedNumbers() {
+    // Reads instantly from memory
+    return { blockedNumbers: this.settingsService.getBlockedNumbers() };
+  }
+
+  @Post('blocked-numbers')
+  async updateBlockedNumbers(@Body('numbers') numbers: string[]) {
+    // Updates DB and memory
+    const updatedNumbers =
+      await this.settingsService.updateBlockedNumbers(numbers);
+
+    return {
+      message: 'Blocked numbers updated successfully',
+      blockedNumbers: updatedNumbers,
+    };
   }
 
   @Get('users')

@@ -9,6 +9,7 @@ import { ThreeDScene } from './scenes/three-d.scene';
 import { WithdrawScene } from './scenes/withdraw.scene';
 import { HighLowScene } from './scenes/high-low.scene';
 import { GamePurchaseScene } from './scenes/game-purchase.scene';
+import { SettingsService } from 'src/admin/settings.service';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { GamePurchaseScene } from './scenes/game-purchase.scene';
     WithdrawScene,
     HighLowScene,
     GamePurchaseScene,
+    SettingsService,
   ],
 })
 export class BotModule {}

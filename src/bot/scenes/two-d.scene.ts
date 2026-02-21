@@ -3,6 +3,7 @@ import { BotContext } from 'src/interfaces/bot-context.interface';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Markup } from 'telegraf';
 import { MAIN_KEYBOARD } from '../bot.update';
+import { SettingsService } from 'src/admin/settings.service';
 
 @Scene('scene_2d')
 export class TwoDScene {
@@ -10,7 +11,10 @@ export class TwoDScene {
   private readonly GLOBAL_LIMIT_PER_NUMBER = 500000;
   private readonly BLOCKED_NUMBERS = ['00', '99'];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settingsService: SettingsService,
+  ) {}
 
   private getSessionInfo() {
     const mmTime = new Date(
@@ -80,6 +84,10 @@ export class TwoDScene {
     if (entries.length === 0)
       return ctx.reply('❌ ပုံစံမှားနေပါသည်။ (e.g. 12.45r-1000)');
 
+    // ⬇️ Fetch dynamic blocked numbers from the database
+    const blockedNumbers = this.settingsService.getBlockedNumbers();
+    // ⬆️ --------------------------------------------------
+
     // ၁။ MIN_BET စစ်ဆေးခြင်း
     for (const entry of entries) {
       if (entry.amount < this.MIN_BET) {
@@ -89,7 +97,7 @@ export class TwoDScene {
         );
       }
       // ၂။ ပိတ်ဂဏန်းစစ်ဆေးခြင်း
-      if (this.BLOCKED_NUMBERS.includes(entry.number)) {
+      if (blockedNumbers.includes(entry.number)) {
         return ctx.reply(
           `❌ <b>${entry.number}</b> သည် ယနေ့အတွက် ပိတ်ဂဏန်းဖြစ်ပါသည်။`,
           { parse_mode: 'HTML' },

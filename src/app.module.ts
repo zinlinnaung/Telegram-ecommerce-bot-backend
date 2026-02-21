@@ -9,6 +9,7 @@ import { LotteryModule } from './lottery/lottery.module';
 import { AdminController } from './admin/admin.controller';
 import { WithdrawService } from './wallet/withdraw.service';
 import { WalletService } from './wallet/wallet.service';
+import { SettingsService } from './admin/settings.service';
 
 @Module({
   imports: [
@@ -43,8 +44,8 @@ import { WalletService } from './wallet/wallet.service';
   providers: [
     WithdrawService, // 👈 ဤနေရာတွင် WithdrawService ကို ထည့်ပေးရပါမည်
     WalletService, // 👈 WalletService ကိုလည်း ထည့်ပေးရပါမည်
-    // ... အခြား providers (PrismaService, etc.)
+    SettingsService, // ... အခြား providers (PrismaService, etc.)
   ],
-  exports: [WithdrawService, WalletService],
+  exports: [WithdrawService, WalletService, SettingsService],
 })
 export class AppModule {}
