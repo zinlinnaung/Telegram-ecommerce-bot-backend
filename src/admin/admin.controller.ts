@@ -668,6 +668,129 @@ export class AdminController {
     }
   }
 
+  @Post('purchase')
+  async purchaseProduct(
+    @Body()
+    body: {
+      telegramId: string;
+      productId: number;
+      playerId?: string; // Game ID အတွက်
+      serverId?: string; // Game Server အတွက်
+      nickname?: string; // Game Nickname အတွက်
+    },
+  ) {
+    const { telegramId, productId, playerId, serverId, nickname } = body;
+
+    return this.prisma.$transaction(async (tx) => {
+      // ၁။ User နှင့် Product ရှိမရှိ စစ်ဆေးခြင်း
+      const tid = BigInt(telegramId);
+      const user = await tx.user.findUnique({ where: { telegramId: tid } });
+      const product = await tx.product.findUnique({ where: { id: productId } });
+
+      if (!user) throw new BadRequestException('User ကို ရှာမတွေ့ပါ');
+      if (!product) throw new BadRequestException('Product ကို ရှာမတွေ့ပါ');
+
+      // ၂။ လက်ကျန်ငွေ စစ်ဆေးခြင်း
+      if (Number(user.balance) < Number(product.price)) {
+        throw new BadRequestException('လက်ကျန်ငွေ မလုံလောက်ပါ');
+      }
+
+      // --- TYPE: AUTO (Digital Keys) ---
+      if (product.type === 'AUTO') {
+        // အသုံးမပြုရသေးသော Key တစ်ခုကို ရှာမည်
+        const productKey = await tx.productKey.findFirst({
+          where: { productId: product.id, isUsed: false },
+        });
+
+        if (!productKey) {
+          throw new BadRequestException(
+            'ပစ္စည်း လက်ကျန်မရှိတော့ပါ။ မကြာမီ ပြန်ဖြည့်ပေးပါမည်။',
+          );
+        }
+
+        // ငွေနှုတ်ပြီး Status ကို တစ်ခါတည်း Update လုပ်မည်
+        await tx.user.update({
+          where: { id: user.id },
+          data: { balance: { decrement: product.price } },
+        });
+
+        await tx.productKey.update({
+          where: { id: productKey.id },
+          data: { isUsed: true },
+        });
+
+        const purchase = await tx.purchase.create({
+          data: {
+            userId: user.id,
+            productId: product.id,
+            amount: product.price,
+            status: 'COMPLETED',
+          },
+        });
+
+        // Telegram သို့ Key ပို့ပေးခြင်း
+        await this.bot.telegram.sendMessage(
+          telegramId,
+          `✅ <b>ဝယ်ယူမှု အောင်မြင်ပါသည်!</b>\n\n` +
+            `📦 ပစ္စည်း: ${product.name}\n` +
+            `🔑 Key: <code>${productKey.key}</code>\n\n` +
+            `ကျေးဇူးတင်ပါသည်။`,
+          { parse_mode: 'HTML' },
+        );
+
+        return {
+          success: true,
+          message: 'Purchase completed',
+          key: productKey.key,
+        };
+      }
+
+      // --- TYPE: MANUAL (Game Top-up) ---
+      else {
+        if (!playerId) throw new BadRequestException('Player ID လိုအပ်ပါသည်');
+
+        // ငွေနှုတ်မည်
+        await tx.user.update({
+          where: { id: user.id },
+          data: { balance: { decrement: product.price } },
+        });
+
+        // PENDING Order အနေဖြင့် မှတ်တမ်းသွင်းမည်
+        const purchase = await tx.purchase.create({
+          data: {
+            userId: user.id,
+            productId: product.id,
+            amount: product.price,
+            status: 'PENDING',
+            playerId: playerId,
+            serverId: serverId || null,
+            // schema ပေါ်မူတည်၍ nickname ပါလျှင် ထည့်ပါ
+          },
+        });
+
+        // Admin ထံ Notification ပို့ခြင်း
+        const adminChannelId = process.env.ADMIN_CHANNEL_ID;
+        await this.bot.telegram.sendMessage(
+          adminChannelId,
+          `🛒 <b>Order အသစ်ရောက်ရှိပါသည်!</b>\n` +
+            `➖➖➖➖➖➖➖➖➖➖\n` +
+            `👤 User: ${user.firstName}\n` +
+            `📦 ပစ္စည်း: ${product.name}\n` +
+            `🆔 Player ID: <code>${playerId}</code>\n` +
+            `🌐 Server: ${serverId || 'N/A'}\n` +
+            `💰 နှုတ်ယူငွေ: ${product.price.toLocaleString()} MMK\n` +
+            `#Order_${purchase.id}`,
+          { parse_mode: 'HTML' },
+        );
+
+        return {
+          success: true,
+          message: 'Order submitted and pending approval',
+        };
+      }
+    });
+  }
+
   @Post('update-settings')
   async updateSettings(
     @Body()
