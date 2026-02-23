@@ -38,15 +38,6 @@ model User {
   highLowBets         HighLowBet[]
 }
 
-// model Product {
-//   id          Int          @id @default(autoincrement())
-//   name        String
-//   category    String // e.g., "VPN", "Netflix"
-//   description String?
-//   price       Decimal      @db.Decimal(10, 2)
-//   keys        ProductKey[]
-//   purchases   Purchase[]
-// }
 
 model ProductKey {
   id         Int       @id @default(autoincrement())

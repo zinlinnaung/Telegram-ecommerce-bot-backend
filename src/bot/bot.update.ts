@@ -785,6 +785,33 @@ export class BotUpdate {
     await ctx.reply(supportText, { parse_mode: 'HTML' });
   }
 
+  @On('text')
+  async onUnknownText(@Ctx() ctx: BotContext) {
+    try {
+      // လက်ရှိ ဝင်နေတဲ့ Scene တွေရှိရင် အတင်းထွက်ခိုင်းပါမယ် (Clean up)
+      await ctx.scene.leave();
+    } catch (e) {
+      // Scene ထဲမှာ မရှိရင်လည် ပြဿနာမရှိပါ
+    }
+
+    const user = await this.usersService.findOrCreateUser(
+      Number(ctx.from.id),
+      ctx.from.first_name,
+      ctx.from.username,
+    );
+
+    // ပင်မစာမျက်နှာ (Main Menu) ကို Keyboard အသစ်နဲ့တကွ ပြန်ပို့ပေးပါမယ်
+    await ctx.reply(
+      `⚠️ <b>ချိတ်ဆက်မှု အချိန်ကြာမြင့်သွားပါသည်။</b>\n\n` +
+        `စနစ်ပိုင်း လုံခြုံရေးအရ ပင်မစာမျက်နှာသို့ ပြန်လည်ရောက်ရှိသွားပါပြီ။ ကျေးဇူးပြု၍ အောက်ပါ မီနူးမှတဆင့် ပြန်လည်ရွေးချယ်ပေးပါခင်ဗျာ။\n\n` +
+        `💰 လက်ရှိလက်ကျန်ငွေ: <b>${user.balance} MMK</b>`,
+      {
+        parse_mode: 'HTML',
+        ...MAIN_KEYBOARD,
+      },
+    );
+  }
+
   // --- Withdraw Admin Actions ---
 
   @Action(/^approve_withdraw_(.+)$/)
