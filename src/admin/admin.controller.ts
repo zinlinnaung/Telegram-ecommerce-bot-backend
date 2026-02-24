@@ -1276,18 +1276,28 @@ export class AdminController {
     @Body() body: any,
   ) {
     try {
+      // 1. Destructure to REMOVE fields Prisma doesn't like (stock, keys, _count, id)
+      // We only keep the fields defined in your schema.prisma
+      const { id: _id, stock, keys, _count, ...validData } = body;
+
+      // 2. Perform the update
       const updatedProduct = await this.prisma.product.update({
         where: { id },
         data: {
-          ...body,
-          // Price ပါလာရင် Decimal ဖြစ်အောင် သေချာစေရန်
-          price: body.price ? Number(body.price) : undefined,
+          ...validData,
+          // Ensure price is handled as a Number/Decimal
+          price:
+            validData.price !== undefined ? Number(validData.price) : undefined,
         },
       });
+
       return { success: true, data: updatedProduct };
     } catch (error) {
-      throw new NotFoundException(
-        'Product ကို ရှာမတွေ့ပါ သို့မဟုတ် ပြင်ဆင်မှု မှားယွင်းနေပါသည်',
+      // Log the error to your terminal so you can see exactly what went wrong
+      console.error('Prisma Update Error:', error);
+
+      throw new BadRequestException(
+        'Product update failed. Ensure you are not sending invalid fields.',
       );
     }
   }
