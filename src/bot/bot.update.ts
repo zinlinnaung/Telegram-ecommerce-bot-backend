@@ -880,7 +880,7 @@ export class BotUpdate {
           '❌ လက်ကျန်ငွေ မလုံလောက်ပါသဖြင့် ငွေအရင်ဖြည့်ပေးပါခင်ဗျာ။',
           {
             ...Markup.inlineKeyboard([
-              [Markup.button.callback('➕ ငွေဖြည့်ရန်', 'topup_scene')],
+              [Markup.button.callback('➕ ငွေဖြည့်မယ်', 'topup_scene')],
             ]),
           },
         );
