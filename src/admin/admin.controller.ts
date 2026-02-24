@@ -893,69 +893,54 @@ export class AdminController {
     let winCount = 0;
 
     // ၃။ Database Processing
+    // settle-result loop ထဲမှာ ပြင်ရန်
     for (const bet of bets) {
-      try {
-        const userId = bet.userId;
-        if (!userResults.has(userId)) {
-          userResults.set(userId, {
-            telegramId: bet.user.telegramId.toString(),
-            winNumbers: [],
-            loseNumbers: [],
-            totalWinAmount: 0,
-          });
-        }
+      const userId = bet.userId;
+      if (!userResults.has(userId)) {
+        userResults.set(userId, {
+          telegramId: bet.user.telegramId.toString(),
+          winNumbers: [],
+          loseNumbers: [],
+          totalWinAmount: 0,
+        });
+      }
 
-        const data = userResults.get(userId); // Fixed variable name from userData to data for consistency in loop below or just use logic correctly
+      const data = userResults.get(userId); // <--- userData ကနေ data လို့ ပြောင်းထားတယ်
 
-        if (bet.number === winNumber) {
-          const multiplier = type === '2D' ? 80 : 500;
-          const winAmount = Number(bet.amount) * multiplier;
+      if (bet.number === winNumber) {
+        const multiplier = type === '2D' ? 80 : 500;
+        const winAmount = Number(bet.amount) * multiplier;
 
-          // Transaction
-          await this.prisma.$transaction([
-            this.prisma.user.update({
-              where: { id: userId },
-              data: { balance: { increment: winAmount } },
-            }),
-            this.prisma.bet.update({
-              where: { id: bet.id },
-              data: { status: 'WIN' },
-            }),
+        // Transaction တစ်ခုချင်းစီအစား ပေါင်းပြီးမှ လုပ်တာ ပိုကောင်းပေမယ့်
+        // အခုအတိုင်း သုံးမယ်ဆိုရင်တောင် data ထဲကို အရင်ထည့်ပါ
+        data.winNumbers.push(bet.number);
+        data.totalWinAmount += winAmount;
+        winCount++;
 
-            // 💡 Transaction မှတ်တမ်းအသစ် ထည့်သွင်းခြင်း
-            this.prisma.transaction.create({
-              data: {
-                userId: userId,
-                amount: winAmount,
-                type: TransactionType.REFUND, // သို့မဟုတ် Enum မှာ အသစ်တိုးပြီး 'WIN_PAYOUT' သုံးပါ
-                description: `${type} (${targetSession}) ပေါက်ဂဏန်း ${winNumber} အတွက် အနိုင်ရငွေ`,
-              },
-            }),
-            this.prisma.withdraw.create({
-              data: {
-                userId: userId,
-                amount: winAmount,
-                status: 'APPROVED',
-                method: 'WIN_PAYOUT',
-                phoneNumber: 'SYSTEM_PAYOUT',
-                accountName: bet.user.username || 'WINNER',
-              },
-            }),
-          ]);
-
-          data.winNumbers.push(bet.number);
-          data.totalWinAmount += winAmount;
-          winCount++;
-        } else {
-          await this.prisma.bet.update({
+        await this.prisma.$transaction([
+          this.prisma.user.update({
+            where: { id: userId },
+            data: { balance: { increment: winAmount } },
+          }),
+          this.prisma.bet.update({
             where: { id: bet.id },
-            data: { status: 'LOSE' },
-          });
-          data.loseNumbers.push(bet.number);
-        }
-      } catch (error) {
-        console.error(`Error processing bet ID ${bet.id}:`, error);
-        continue;
+            data: { status: 'WIN' },
+          }),
+          this.prisma.transaction.create({
+            data: {
+              userId,
+              amount: winAmount,
+              type: TransactionType.REFUND,
+              description: `${type} (${targetSession}) ပေါက်ဂဏန်း ${winNumber} အနိုင်ရငွေ`,
+            },
+          }),
+        ]);
+      } else {
+        await this.prisma.bet.update({
+          where: { id: bet.id },
+          data: { status: 'LOSE' },
+        });
+        data.loseNumbers.push(bet.number);
       }
     }
 

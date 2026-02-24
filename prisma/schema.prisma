@@ -38,7 +38,6 @@ model User {
   highLowBets         HighLowBet[]
 }
 
-
 model ProductKey {
   id         Int       @id @default(autoincrement())
   key        String    @unique // The actual VPN key or login credential
@@ -73,7 +72,8 @@ model Transaction {
 
 enum ProductType {
   AUTO // For VPN Keys, Netflix (Instant)
-  MANUAL // For MLBB, PUBG (Requires Admin Action)
+  MANUAL // For MLBB, PUBG (Requires Admin Action),
+  API
 }
 
 enum PurchaseStatus {
