@@ -94,12 +94,12 @@ export class TopUpScene {
     const paymentInfo =
       `🏦 <b>ငွေလွှဲရန် အကောင့်များ</b>\n` +
       `➖➖➖➖➖➖➖➖➖➖\n` +
-      `💎 <b>KBZ Pay</b> : <code>09447032756</code>\n` +
-      `💎 <b>AYA Pay</b> : <code>09447032756</code>\n` +
-      `💎 <b>CB Pay</b>  : <code>09447032756</code>\n` +
+      `💎 <b>KBZ Pay</b> : <code>09447032756</code> Name:<b>Zin Linn Aung</b> \n ` +
+      `💎 <b>Wave Pay</b> : <code>09447032756</code> Name:<b>Zin Linn Aung</b> \n` +
+      `💎 <b>AYA Pay</b>  : <code>09447032756</code> Name:<b>Zin Linn Aung</b> \n` +
       `➖➖➖➖➖➖➖➖➖➖\n\n` +
       `သွင်းငွေပမာဏ: <b>${amount.toLocaleString()} MMK</b>\n\n` +
-      `အထက်ပါ အကောင့်များထဲမှ တစ်ခုခုသို့ ငွေလွှဲပေးပါခင်ဗျာ။\n` +
+      `အထက်ပါ အကောင့်များထဲမှ တစ်ခုခုသို့ ငွေ ${amount}MMKလွှဲပေးပါခင်ဗျာ။\n` +
       `ငွေလွှဲပြီးပါက <b>ငွေလွှဲပြေစာ (Screenshot)</b> ကို ပေးပို့ပေးပါ။`;
 
     await ctx.reply(paymentInfo, {
