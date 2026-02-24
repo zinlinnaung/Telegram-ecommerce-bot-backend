@@ -855,7 +855,7 @@ export class BotUpdate {
       const isApi = result.type === 'API';
       const keyLabel = isApi ? '🔗 Subscription Link' : '🔑 Product Key';
       const noteText = isApi
-        ? '<i>(အပေါ်က Link ကို Copy ကူးပြီး v2rayNG သို့မဟုတ် Hiddify App ထဲတွင် Add လုပ်နိုင်ပါသည်)</i>'
+        ? `<i>(အပေါ်က Link ကို Copy ကူးပြီး ${result.product.subCategory} App ထဲတွင် Add လုပ်နိုင်ပါသည်)</i>`
         : '<i>(Key ကို တစ်ချက်နှိပ်ရုံဖြင့် Copy ကူးယူနိုင်ပါသည်)</i>';
 
       const successText =
