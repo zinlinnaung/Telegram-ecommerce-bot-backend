@@ -18,10 +18,11 @@ import { BotContext } from 'src/interfaces/bot-context.interface';
 import { PrismaService } from '../prisma/prisma.service';
 
 export const MAIN_KEYBOARD = Markup.keyboard([
-  ['🎮 ဂိမ်းကစားမယ်'], // This is your new Category
-  ['🛒 စျေးဝယ်မယ်', '💰 လက်ကျန်ငွေ'],
-  ['➕ ငွေဖြည့်မယ်', '💸 ငွေထုတ်မယ်'],
-  ['👥 ဖိတ်ခေါ်မယ်', '📞 အကူအညီ'],
+  ['🛒 စျေးဝယ်မယ်', '📝 စျေးဝယ်မှတ်တမ်း'], // ခလုတ်အသစ်ထည့်လိုက်သည်
+  ['💰 လက်ကျန်ငွေ', '➕ ငွေဖြည့်မယ်'],
+  ['💸 ငွေထုတ်မယ်', '👥 ဖိတ်ခေါ်မယ်'],
+  ['🎮 ဂိမ်းကစားမယ်'],
+  ['📞 အကူအညီ'],
 ]).resize();
 export const GAME_KEYBOARD = Markup.keyboard([
   ['🎰 2D ထိုးမယ်', '🎲 3D ထိုးမယ်'],
@@ -233,6 +234,58 @@ export class BotUpdate {
         parse_mode: 'HTML',
       },
     );
+  }
+
+  @Hears('📝 စျေးဝယ်မှတ်တမ်း')
+  async onPurchaseHistory(@Ctx() ctx: BotContext) {
+    const telegramId = ctx.from.id;
+
+    try {
+      // ၁။ User ID ကို ရှာမယ်
+      const user = await this.prisma.user.findUnique({
+        where: { telegramId: BigInt(telegramId) },
+      });
+
+      if (!user) return;
+
+      // ၂။ ဝယ်ယူမှုမှတ်တမ်းကို Service မှတဆင့် ယူမယ်
+      const history = await this.productsService.getPurchaseHistory(user.id);
+
+      if (history.length === 0) {
+        return await ctx.reply(
+          '⚠️ လူကြီးမင်းမှာ ဝယ်ယူထားတဲ့ မှတ်တမ်း မရှိသေးပါဘူးခင်ဗျာ။',
+        );
+      }
+
+      let message = `📝 <b>လူကြီးမင်း၏ စျေးဝယ်မှတ်တမ်း (နောက်ဆုံး ၁၀ ခု)</b>\n`;
+      message += `━━━━━━━━━━━━━━━━━━\n\n`;
+
+      history.forEach((item, index) => {
+        const date = new Date(item.createdAt).toLocaleDateString('en-GB');
+        const isApi = item.product.type === 'API';
+        const keyLabel = isApi ? '🔗 Link' : '🔑 Key';
+
+        message += `${index + 1}. 📦 <b>${item.product.name}</b>\n`;
+        message += `💰 ဈေးနှုန်း: ${item.amount} MMK\n`;
+        message += `📅 ရက်စွဲ: ${date}\n`;
+
+        // Key သို့မဟုတ် API Link ရှိလျှင် ပြပေးမယ်
+        if (item.productKey) {
+          message += `${keyLabel}: <code>${item.productKey.key}</code>\n`;
+        } else if (item.status === 'PENDING') {
+          message += `⏳ အခြေအနေ: <b>စောင့်ဆိုင်းဆဲ (Admin Approve)</b>\n`;
+        } else if (item.status === 'REJECTED') {
+          message += `❌ အခြေအနေ: <b>ငြင်းပယ်ခံရသည် (Refunded)</b>\n`;
+        }
+
+        message += `━━━━━━━━━━━━━━━━━━\n`;
+      });
+
+      await ctx.reply(message, { parse_mode: 'HTML' });
+    } catch (error) {
+      console.error('Purchase History Error:', error);
+      await ctx.reply('❌ မှတ်တမ်းရှာဖွေရာတွင် အမှားအယွင်းရှိနေပါသည်။');
+    }
   }
 
   @Hears('🎮 ဂိမ်းကစားမယ်')
@@ -682,24 +735,48 @@ export class BotUpdate {
     );
 
     try {
+      // ProductsService မှ purchaseProduct ကို ခေါ်ယူခြင်း
       const result = await this.productsService.purchaseProduct(
         dbUser.id,
         productId,
       );
 
       await ctx.deleteMessage();
+
+      // ပစ္စည်းအမျိုးအစားအလိုက် စာသားခွဲခြားသတ်မှတ်ခြင်း
+      const isApi = result.type === 'API';
+      const keyLabel = isApi ? '🔗 Subscription Link' : '🔑 Product Key';
+      const noteText = isApi
+        ? '<i>(အပေါ်က Link ကို Copy ကူးပြီး v2rayNG သို့မဟုတ် Hiddify App ထဲတွင် Add လုပ်နိုင်ပါသည်)</i>'
+        : '<i>(Key ကို တစ်ချက်နှိပ်ရုံဖြင့် Copy ကူးယူနိုင်ပါသည်)</i>';
+
       const successText =
         `✅ <b>ဝယ်ယူမှု အောင်မြင်ပါသည်!</b>\n\n` +
         `📦 <b>ဝယ်ယူသည့်ပစ္စည်း:</b> ${result.product.name}\n\n` +
-        `🔑 <b>လူကြီးမင်း၏ Key:</b>\n` +
+        `<b>${keyLabel}:</b>\n` +
         `<code>${result.key}</code>\n\n` +
-        `<i>(Key ကို တစ်ချက်နှိပ်ရုံဖြင့် Copy ကူးယူနိုင်ပါသည်)</i>\n\n` +
-        `<i>မှတ်ချက်။ ။ ဤ Key ကို လုံခြုံစွာ သိမ်းဆည်းထားပေးပါခင်ဗျာ။</i>`;
+        `${noteText}\n\n` +
+        `<i>မှတ်ချက်။ ။ ဝယ်ယူထားသော မှတ်တမ်းကို "စျေးဝယ်မှတ်တမ်း" (ရှိလျှင်) တွင် ပြန်လည်ကြည့်ရှုနိုင်ပါသည်။</i>`;
 
-      await ctx.reply(successText, { parse_mode: 'HTML' });
+      await ctx.reply(successText, {
+        parse_mode: 'HTML',
+        ...MAIN_KEYBOARD, // ပင်မ Menu ပြန်ပြပေးမယ်
+      });
     } catch (error: any) {
+      // Error ဖြစ်ရင် Alert ထိုးပြမယ်
       await ctx.answerCbQuery(error.message, { show_alert: true });
-      await ctx.reply(`❌ Purchase failed: ${error.message}`);
+
+      // balance မလုံလောက်ရင် ငွေဖြည့်ခိုင်းတဲ့ ခလုတ်ပြပေးလို့ရတယ်
+      if (error.message.includes('မလုံလောက်')) {
+        await ctx.reply(
+          '❌ လက်ကျန်ငွေ မလုံလောက်ပါသဖြင့် ငွေအရင်ဖြည့်ပေးပါခင်ဗျာ။',
+          {
+            ...Markup.inlineKeyboard([
+              [Markup.button.callback('➕ ငွေဖြည့်ရန်', 'topup_scene')],
+            ]),
+          },
+        );
+      }
     }
   }
 
