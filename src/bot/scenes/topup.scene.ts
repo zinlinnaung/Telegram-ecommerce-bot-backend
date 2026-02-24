@@ -100,7 +100,7 @@ export class TopUpScene {
       `Name:<b>Zin Linn Aung</b> \n` +
       `➖➖➖➖➖➖➖➖➖➖\n\n` +
       `သွင်းငွေပမာဏ: <b>${amount.toLocaleString()} MMK</b>\n\n` +
-      `အထက်ပါ အကောင့်များထဲမှ တစ်ခုခုသို့ ငွေ ${amount}MMKလွှဲပေးပါခင်ဗျာ။\n` +
+      `အထက်ပါ အကောင့်များထဲမှ တစ်ခုခုသို့ ငွေ ${amount}MMK လွှဲပေးပါခင်ဗျာ။\n` +
       `ငွေလွှဲပြီးပါက <b>ငွေလွှဲပြေစာ (Screenshot)</b> ကို ပေးပို့ပေးပါ။`;
 
     await ctx.reply(paymentInfo, {
