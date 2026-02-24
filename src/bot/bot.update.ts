@@ -960,6 +960,20 @@ export class BotUpdate {
     }
   }
 
+  @Action('topup_scene')
+  async onTopUpAction(@Ctx() ctx: BotContext) {
+    // ၁။ Loading icon လေး ပျောက်သွားအောင် answer ပေးပါ
+    await ctx.answerCbQuery();
+
+    // ၂။ လက်ရှိ message ကို ဖျက်ချင်ရင် ဖျက်နိုင်ပါတယ် (Optional)
+    try {
+      await ctx.deleteMessage();
+    } catch (e) {}
+
+    // ၃။ Scene ထဲကို အတင်းဝင်ခိုင်းပါ
+    await ctx.scene.enter('topup_scene');
+  }
+
   @Hears('📞 အကူအညီ')
   async onSupport(@Ctx() ctx: BotContext) {
     const supportText =
