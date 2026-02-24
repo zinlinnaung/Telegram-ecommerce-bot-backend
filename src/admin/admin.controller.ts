@@ -1250,6 +1250,8 @@ export class AdminController {
       description?: string;
       price: number;
       type: 'AUTO' | 'MANUAL' | 'API';
+      usageLimitGB?: number; // Added this
+      packageDays?: number; // Added this
     },
   ) {
     try {
@@ -1261,6 +1263,8 @@ export class AdminController {
           description: body.description,
           price: body.price,
           type: body.type,
+          usageLimitGB: body.usageLimitGB || 0, // Save to DB
+          packageDays: body.packageDays || 30, // Save to DB
         },
       });
       return { success: true, data: product };

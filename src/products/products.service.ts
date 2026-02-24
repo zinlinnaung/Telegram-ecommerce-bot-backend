@@ -86,15 +86,15 @@ export class ProductsService {
         let subscriptionUrl = '';
 
         try {
-          // Hiddify API ကို လှမ်းခေါ်ခြင်း
+          // We use product.usageLimitGB and product.packageDays from the database
           const hiddifyRes = await axios.post(
             'https://net.notuse.xyz/eMTscaVR0wZgDa99t1Itsd/api/v2/admin/user/',
             {
-              name: `${user.id}_${product.name}_${Date.now()}`, // Unique ဖြစ်အောင် နာမည်ပေးခြင်း
-              usage_limit_GB: 50, // Product description သို့မဟုတ် column အသစ်မှ dynamic ယူနိုင်သည်
-              package_days: 30,
+              name: `${user.id}_${product.name}_${Date.now()}`,
+              usage_limit_GB: product.usageLimitGB || 50, // Fallback to 50 if null
+              package_days: product.packageDays || 30, // Fallback to 30 if null
               mode: 'no_reset',
-              comment: `Bought by UserID: ${user.id}`,
+              comment: `Bought by UserID: ${user.id} | Product: ${product.name}`,
             },
             {
               headers: {
@@ -104,7 +104,6 @@ export class ProductsService {
             },
           );
 
-          // Response ထဲက uuid ကို ယူပြီး ပေးရမည့် Format သို့ ပြောင်းလဲခြင်း
           const userUuid = hiddifyRes.data.uuid;
           subscriptionUrl = `https://net.notuse.xyz/MpLQ6YVffFqqn4pxPMrYz7cDe/${userUuid}`;
         } catch (error: any) {
