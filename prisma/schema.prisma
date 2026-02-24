@@ -84,13 +84,13 @@ enum PurchaseStatus {
 
 // 2. Update Product Model
 model Product {
-  id          Int     @id @default(autoincrement())
-  name        String
-  category    String
-  subCategory String?
-  description String?
-  price       Decimal @db.Decimal(10, 2)
-
+  id           Int          @id @default(autoincrement())
+  name         String
+  category     String
+  subCategory  String?
+  description  String?
+  price        Decimal      @db.Decimal(10, 2)
+  isFreeTrial  Boolean      @default(false)
   usageLimitGB Int?         @default(0) // 0 or null could mean unlimited
   packageDays  Int?         @default(30) // Default to 30 days
   type         ProductType  @default(AUTO) // <--- Add this

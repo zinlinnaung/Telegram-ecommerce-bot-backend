@@ -6,14 +6,6 @@ import axios from 'axios';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  // async getCategories() {
-  //   const categories = await this.prisma.product.findMany({
-  //     select: { category: true },
-  //     distinct: ['category'],
-  //   });
-  //   return categories.map((c) => c.category);
-  // }
-
   async getProductsByCategory(category: string) {
     return this.prisma.product.findMany({ where: { category } });
   }
@@ -23,14 +15,13 @@ export class ProductsService {
       where: { userId },
       include: {
         product: true,
-        productKey: true, // Key ပါတဲ့ table ကို join လုပ်မယ်
+        productKey: true,
       },
       orderBy: { createdAt: 'desc' },
-      take: 10, // နောက်ဆုံးဝယ်ထားတဲ့ ၁၀ ခုပဲ ပြမယ်
+      take: 10,
     });
   }
 
-  // purchaseProduct ကို playerId နဲ့ serverId ပါ လက်ခံနိုင်အောင် ပြင်လိုက်ပါတယ်
   async purchaseProduct(
     userId: number,
     productId: number,
@@ -45,8 +36,30 @@ export class ProductsService {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) throw new BadRequestException('User not found.');
 
-      if (Number(user.balance) < Number(product.price))
+      // --- [NEW] FREE TRIAL CHECK ---
+      // အကယ်၍ product က trial ဖြစ်နေရင် အရင်ဝယ်ဖူးသလား စစ်မယ်
+      if (product.isFreeTrial) {
+        const alreadyClaimed = await tx.purchase.findFirst({
+          where: {
+            userId: userId,
+            productId: productId,
+          },
+        });
+
+        if (alreadyClaimed) {
+          throw new BadRequestException(
+            'ဒီ Free Trial ကို တစ်ခါပဲ ရယူခွင့်ရှိပါတယ်ခင်ဗျာ။',
+          );
+        }
+      }
+
+      // ဈေးနှုန်းရှိမှသာ လက်ကျန်ငွေ ရှိ/မရှိ စစ်မယ်
+      if (
+        Number(product.price) > 0 &&
+        Number(user.balance) < Number(product.price)
+      ) {
         throw new BadRequestException('လက်ကျန်ငွေ မလုံလောက်ပါဘူးခင်ဗျာ။');
+      }
 
       // --- LOGIC 1: AUTO PRODUCT ---
       if (product.type === 'AUTO') {
@@ -59,10 +72,13 @@ export class ProductsService {
             'ဒီပစ္စည်းကတော့ လက်ရှိမှာ Stock ပြတ်နေပါတယ်ခင်ဗျ။',
           );
 
-        await tx.user.update({
-          where: { id: userId },
-          data: { balance: { decrement: product.price } },
-        });
+        // Price ရှိမှသာ Balance နှုတ်မယ်
+        if (Number(product.price) > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { balance: { decrement: product.price } },
+          });
+        }
 
         await tx.productKey.update({
           where: { id: availableKey.id },
@@ -86,15 +102,14 @@ export class ProductsService {
         let subscriptionUrl = '';
 
         try {
-          // We use product.usageLimitGB and product.packageDays from the database
           const hiddifyRes = await axios.post(
             'https://net.notuse.xyz/eMTscaVR0wZgDa99t1Itsd/api/v2/admin/user/',
             {
               name: `${user.id}_${product.name}_${Date.now()}`,
-              usage_limit_GB: product.usageLimitGB || 50, // Fallback to 50 if null
-              package_days: product.packageDays || 30, // Fallback to 30 if null
+              usage_limit_GB: product.usageLimitGB || 1, // Trial အတွက်ဆို ၁ GB
+              package_days: product.packageDays || 30, // Trial အတွက်ဆို ၃၀ ရက်
               mode: 'no_reset',
-              comment: `Bought by UserID: ${user.id} | Product: ${product.name}`,
+              comment: `Bought by UserID: ${user.id} | Product: ${product.name} ${product.isFreeTrial ? '(TRIAL)' : ''}`,
             },
             {
               headers: {
@@ -116,13 +131,14 @@ export class ProductsService {
           );
         }
 
-        // Balance နှုတ်မယ်
-        await tx.user.update({
-          where: { id: userId },
-          data: { balance: { decrement: product.price } },
-        });
+        // Price ရှိမှသာ Balance နှုတ်မယ်
+        if (Number(product.price) > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { balance: { decrement: product.price } },
+          });
+        }
 
-        // Purchase Record သိမ်းမယ်
         const purchase = await tx.purchase.create({
           data: {
             userId,
@@ -132,7 +148,6 @@ export class ProductsService {
           },
         });
 
-        // API ကရလာတဲ့ Link ကို Key အနေနဲ့ တန်းသိမ်းမယ်
         await tx.productKey.create({
           data: {
             key: subscriptionUrl,
@@ -149,10 +164,12 @@ export class ProductsService {
       else {
         if (!playerId) throw new BadRequestException('Player ID လိုအပ်ပါသည်။');
 
-        await tx.user.update({
-          where: { id: userId },
-          data: { balance: { decrement: product.price } },
-        });
+        if (Number(product.price) > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { balance: { decrement: product.price } },
+          });
+        }
 
         const purchase = await tx.purchase.create({
           data: {
@@ -178,17 +195,15 @@ export class ProductsService {
     return products.map((p) => p.category);
   }
 
-  // ၂။ ရွေးချယ်ထားသော Category အောက်ရှိ Subcategories များယူရန်
   async getSubCategories(category: string) {
     const products = await this.prisma.product.findMany({
       where: { category },
       select: { subCategory: true },
       distinct: ['subCategory'],
     });
-    return products.map((p) => p.subCategory).filter(Boolean); // null ဖြစ်နေတာတွေ ဖယ်ထုတ်မယ်
+    return products.map((p) => p.subCategory).filter(Boolean);
   }
 
-  // ၃။ Subcategory အလိုက် Product များယူရန်
   async getProductsBySubCategory(category: string, subCategory: string) {
     return this.prisma.product.findMany({
       where: {
