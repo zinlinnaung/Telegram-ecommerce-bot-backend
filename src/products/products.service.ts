@@ -6,13 +6,13 @@ import axios from 'axios';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async getCategories() {
-    const categories = await this.prisma.product.findMany({
-      select: { category: true },
-      distinct: ['category'],
-    });
-    return categories.map((c) => c.category);
-  }
+  // async getCategories() {
+  //   const categories = await this.prisma.product.findMany({
+  //     select: { category: true },
+  //     distinct: ['category'],
+  //   });
+  //   return categories.map((c) => c.category);
+  // }
 
   async getProductsByCategory(category: string) {
     return this.prisma.product.findMany({ where: { category } });
@@ -168,6 +168,34 @@ export class ProductsService {
 
         return { type: 'MANUAL', product, purchaseId: purchase.id };
       }
+    });
+  }
+
+  async getCategories() {
+    const products = await this.prisma.product.findMany({
+      select: { category: true },
+      distinct: ['category'],
+    });
+    return products.map((p) => p.category);
+  }
+
+  // ၂။ ရွေးချယ်ထားသော Category အောက်ရှိ Subcategories များယူရန်
+  async getSubCategories(category: string) {
+    const products = await this.prisma.product.findMany({
+      where: { category },
+      select: { subCategory: true },
+      distinct: ['subCategory'],
+    });
+    return products.map((p) => p.subCategory).filter(Boolean); // null ဖြစ်နေတာတွေ ဖယ်ထုတ်မယ်
+  }
+
+  // ၃။ Subcategory အလိုက် Product များယူရန်
+  async getProductsBySubCategory(category: string, subCategory: string) {
+    return this.prisma.product.findMany({
+      where: {
+        category,
+        subCategory,
+      },
     });
   }
 }

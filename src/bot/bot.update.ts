@@ -548,13 +548,14 @@ export class BotUpdate {
 
   // --- Shop Flow ---
 
+  // --- Shop Flow (Modified for Subcategories) ---
+
   @Hears('🛒 စျေးဝယ်မယ်')
   @Action('shop_main')
   async onShop(@Ctx() ctx: BotContext) {
     const categories = await this.productsService.getCategories();
 
     if (categories.length === 0) {
-      // FIX: Add await and remove 'return' from the front of ctx.reply
       await ctx.reply(
         'လက်ရှိမှာ ဝယ်ယူလို့ရနိုင်တဲ့ ပစ္စည်း မရှိသေးပါဘူးခင်ဗျာ။',
       );
@@ -568,34 +569,82 @@ export class BotUpdate {
     const text = '📂 အမျိုးအစား တစ်ခု ရွေးချယ်ပေးပါခင်ဗျာ';
 
     if (ctx.callbackQuery) {
-      // FIX: Add await and do not return the result
       await ctx.editMessageText(text, Markup.inlineKeyboard(buttons));
     } else {
-      // FIX: Add await and do not return the result
       await ctx.reply(text, Markup.inlineKeyboard(buttons));
     }
-
-    // Explicitly return nothing to prevent [object Object]
-    return;
   }
 
+  // ၁။ Category ကိုနှိပ်လိုက်ရင် Subcategory များကို ပြပေးမည့် Logic
   @Action(/^cat_(.+)$/)
   async onCategorySelect(@Ctx() ctx: BotContext) {
     // @ts-ignore
     const category = ctx.match[1];
-    const products = await this.productsService.getProductsByCategory(category);
+    const subCategories = await this.productsService.getSubCategories(category);
 
-    const buttons = products.map((p) => [
-      Markup.button.callback(`${p.name} - ${p.price} MMK`, `prod_${p.id}`),
+    // အကယ်၍ Subcategory မရှိရင် Product တန်းပြမယ် (Backward compatibility)
+    if (subCategories.length === 0) {
+      const products =
+        await this.productsService.getProductsByCategory(category);
+      return this.renderProductList(ctx, products, category, 'shop_main');
+    }
+
+    const buttons = subCategories.map((sc) => [
+      Markup.button.callback(sc, `sub_${category}_${sc}`),
     ]);
+
     buttons.push([
-      Markup.button.callback('🔙 Back to Categories', 'shop_main'),
+      Markup.button.callback('🔙 ပင်မအမျိုးအစားသို့', 'shop_main'),
     ]);
 
     await ctx.editMessageText(
-      `📂 အမျိုးအစား - ${category}\n\nအသေးစိတ်ကြည့်ရှုရန်အတွက် ပစ္စည်းတစ်ခုခုကို ရွေးချယ်ပေးပါခင်ဗျာ -`,
+      `📂 <b>${category}</b> အောက်ရှိ အမျိုးအစားခွဲများ -`,
       {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard(buttons),
+      },
+    );
+  }
+
+  // ၂။ Subcategory ကိုနှိပ်လိုက်ရင် သက်ဆိုင်ရာ Product များကို ပြပေးမည့် Logic
+  @Action(/^sub_(.+)_(.+)$/)
+  async onSubCategorySelect(@Ctx() ctx: BotContext) {
+    // @ts-ignore
+    const category = ctx.match[1];
+    // @ts-ignore
+    const subCategory = ctx.match[2];
+
+    const products = await this.productsService.getProductsBySubCategory(
+      category,
+      subCategory,
+    );
+
+    // Back button အတွက် Category menu ကို ပြန်ညွှန်းမယ်
+    return this.renderProductList(
+      ctx,
+      products,
+      subCategory,
+      `cat_${category}`,
+    );
+  }
+
+  // Product List များကို ဆွဲထုတ်ပေးမည့် Helper Function
+  private async renderProductList(
+    ctx: BotContext,
+    products: any[],
+    title: string,
+    backAction: string,
+  ) {
+    const buttons = products.map((p) => [
+      Markup.button.callback(`${p.name} - ${p.price} MMK`, `prod_${p.id}`),
+    ]);
+
+    buttons.push([Markup.button.callback('🔙 နောက်သို့', backAction)]);
+
+    await ctx.editMessageText(
+      `🛒 <b>${title}</b>\n\nဝယ်ယူလိုသည့် ပစ္စည်းကို ရွေးချယ်ပေးပါခင်ဗျာ -`,
+      {
+        parse_mode: 'HTML',
         ...Markup.inlineKeyboard(buttons),
       },
     );
@@ -610,24 +659,83 @@ export class BotUpdate {
       where: { id: productId },
     });
 
-    // CHECK IF MANUAL (GAME) OR AUTO (KEY)
+    if (!product) return ctx.answerCbQuery('Product not found.');
+
+    // MANUAL PRODUCT (GAME TOPUP) ဖြစ်လျှင် Scene ထဲဝင်မယ်
     if (product.type === 'MANUAL') {
-      // Enter the Scene for MLBB/PUBG
-      await ctx.deleteMessage(); // Clean up menu
+      await ctx.deleteMessage();
       // @ts-ignore
       await ctx.scene.enter('game_purchase_scene', { productId });
       return;
     }
 
-    // EXISTING LOGIC FOR KEYS/AUTO
+    // AUTO သို့မဟုတ် API PRODUCT များအတွက် အတည်ပြုချက်တောင်းမယ်
+    // Back button အတွက် Subcategory ရှိလျှင် ပြန်ညွှန်းရန် logic
+    const backBtn = product.subCategory
+      ? `sub_${product.category}_${product.subCategory}`
+      : `cat_${product.category}`;
+
     await ctx.editMessageText(
-      `❓ ဤပစ္စည်းကို ဝယ်ယူရန် သေချာပါသလား?\n\n📦 ${product.name}\n💰 ${product.price} MMK`,
-      Markup.inlineKeyboard([
-        [Markup.button.callback('✅ ဝယ်ယူရန် အတည်ပြုသည်', `buy_${productId}`)],
-        [Markup.button.callback('❌ မဝယ်တော့ပါ', 'shop_main')],
-      ]),
+      `❓ <b>ဝယ်ယူရန် အတည်ပြုချက်</b>\n\n📦 ပစ္စည်း: <b>${product.name}</b>\n💰 ဈေးနှုန်း: <b>${product.price} MMK</b>\n\nဝယ်ယူရန် သေချာပါသလား?`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard([
+          [Markup.button.callback('✅ ဝယ်ယူမည်', `buy_${productId}`)],
+          [Markup.button.callback('❌ မဝယ်တော့ပါ', backBtn)],
+        ]),
+      },
     );
   }
+
+  // @Action(/^cat_(.+)$/)
+  // async onCategorySelect(@Ctx() ctx: BotContext) {
+  //   // @ts-ignore
+  //   const category = ctx.match[1];
+  //   const products = await this.productsService.getProductsByCategory(category);
+
+  //   const buttons = products.map((p) => [
+  //     Markup.button.callback(`${p.name} - ${p.price} MMK`, `prod_${p.id}`),
+  //   ]);
+  //   buttons.push([
+  //     Markup.button.callback('🔙 Back to Categories', 'shop_main'),
+  //   ]);
+
+  //   await ctx.editMessageText(
+  //     `📂 အမျိုးအစား - ${category}\n\nအသေးစိတ်ကြည့်ရှုရန်အတွက် ပစ္စည်းတစ်ခုခုကို ရွေးချယ်ပေးပါခင်ဗျာ -`,
+  //     {
+  //       parse_mode: 'Markdown',
+  //       ...Markup.inlineKeyboard(buttons),
+  //     },
+  //   );
+  // }
+
+  // @Action(/^prod_(.+)$/)
+  // async onProductSelect(@Ctx() ctx: BotContext) {
+  //   // @ts-ignore
+  //   const productId = parseInt(ctx.match[1]);
+
+  //   const product = await this.prisma.product.findUnique({
+  //     where: { id: productId },
+  //   });
+
+  //   // CHECK IF MANUAL (GAME) OR AUTO (KEY)
+  //   if (product.type === 'MANUAL') {
+  //     // Enter the Scene for MLBB/PUBG
+  //     await ctx.deleteMessage(); // Clean up menu
+  //     // @ts-ignore
+  //     await ctx.scene.enter('game_purchase_scene', { productId });
+  //     return;
+  //   }
+
+  //   // EXISTING LOGIC FOR KEYS/AUTO
+  //   await ctx.editMessageText(
+  //     `❓ ဤပစ္စည်းကို ဝယ်ယူရန် သေချာပါသလား?\n\n📦 ${product.name}\n💰 ${product.price} MMK`,
+  //     Markup.inlineKeyboard([
+  //       [Markup.button.callback('✅ ဝယ်ယူရန် အတည်ပြုသည်', `buy_${productId}`)],
+  //       [Markup.button.callback('❌ မဝယ်တော့ပါ', 'shop_main')],
+  //     ]),
+  //   );
+  // }
 
   // ------------------------------------------
   // 2. ADD THESE NEW ADMIN ACTIONS
