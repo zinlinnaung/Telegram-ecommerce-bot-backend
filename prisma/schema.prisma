@@ -43,7 +43,7 @@ model ProductKey {
   key        String    @unique // The actual VPN key or login credential
   isUsed     Boolean   @default(false)
   productId  Int
-  product    Product   @relation(fields: [productId], references: [id])
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   purchaseId Int?      @unique
   purchase   Purchase? @relation(fields: [purchaseId], references: [id])
 }
@@ -94,8 +94,8 @@ model Product {
   usageLimitGB Int?         @default(0) // 0 or null could mean unlimited
   packageDays  Int?         @default(30) // Default to 30 days
   type         ProductType  @default(AUTO) // <--- Add this
-  keys         ProductKey[] @relation(onDelete: Cascade)
-  purchases    Purchase[]   @relation(onDelete: Cascade)
+  keys         ProductKey[]
+  purchases    Purchase[]
 }
 
 // 3. Update Purchase Model
@@ -113,7 +113,7 @@ model Purchase {
 
   createdAt  DateTime    @default(now())
   user       User        @relation(fields: [userId], references: [id])
-  product    Product     @relation(fields: [productId], references: [id])
+  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
   productKey ProductKey?
 }
 
