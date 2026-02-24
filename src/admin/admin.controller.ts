@@ -166,9 +166,23 @@ export class AdminController {
   }
   @Get('products')
   async getAllProducts() {
-    return this.prisma.product.findMany({
-      include: { keys: true },
+    const products = await this.prisma.product.findMany({
+      include: {
+        _count: {
+          select: {
+            keys: {
+              where: { isUsed: false }, // Only count keys that haven't been sold
+            },
+          },
+        },
+      },
     });
+
+    // We map the data so the frontend receives a simple 'stock' number
+    return products.map((p) => ({
+      ...p,
+      stock: p._count.keys,
+    }));
   }
 
   @Get('blocked-numbers')
