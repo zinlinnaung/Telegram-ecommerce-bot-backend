@@ -107,6 +107,56 @@ export class AdminController {
     };
   }
 
+  @Get('products/:id')
+  async getProduct(@Param('id', ParseIntPipe) id: number) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: {
+        keys: {
+          where: { isUsed: false }, // We include all keys, the frontend will filter !isUsed
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    return product;
+  }
+
+  // This handles the "Add Keys" button logic
+  @Post('products/:id/keys')
+  async addKeys(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { keys: string[] },
+  ) {
+    const { keys } = body;
+
+    const data = keys.map((key) => ({
+      key: key.trim(),
+      productId: id,
+    }));
+
+    await this.prisma.productKey.createMany({
+      data: data,
+    });
+
+    return { success: true, count: keys.length };
+  }
+
+  // Standard Update Product (for the Edit button)
+  // @Patch('products/:id')
+  // async updateProduct(
+  //   @Param('id', ParseIntPipe) id: number,
+  //   @Body() data: any,
+  // ) {
+  //   return await this.prisma.product.update({
+  //     where: { id },
+  //     data,
+  //   });
+  // }
+
   @Get('orders')
   async getAllOrders(
     @Query('status') status?: string,
