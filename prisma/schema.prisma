@@ -94,8 +94,8 @@ model Product {
   usageLimitGB Int?         @default(0) // 0 or null could mean unlimited
   packageDays  Int?         @default(30) // Default to 30 days
   type         ProductType  @default(AUTO) // <--- Add this
-  keys         ProductKey[]
-  purchases    Purchase[]
+  keys         ProductKey[] @relation(onDelete: Cascade)
+  purchases    Purchase[]   @relation(onDelete: Cascade)
 }
 
 // 3. Update Purchase Model
