@@ -98,32 +98,71 @@ export class ProductsService {
       }
 
       // --- LOGIC 2: API PRODUCT (Hiddify VPN API Integration) ---
+      // --- LOGIC 2: API PRODUCT (Based on subCategory) ---
       else if (product.type === 'API') {
         let subscriptionUrl = '';
 
-        try {
-          const hiddifyRes = await axios.post(
-            'https://net.notuse.xyz/eMTscaVR0wZgDa99t1Itsd/api/v2/admin/user/',
-            {
-              name: `${user.id}_${product.name}_${Date.now()}`,
-              usage_limit_GB: product.usageLimitGB || 1, // Trial အတွက်ဆို ၁ GB
-              package_days: product.packageDays || 30, // Trial အတွက်ဆို ၃၀ ရက်
-              mode: 'no_reset',
-              comment: `Bought by UserID: ${user.id} | Product: ${product.name} ${product.isFreeTrial ? '(TRIAL)' : ''}`,
-            },
-            {
-              headers: {
-                'Hiddify-API-Key': '2b4b13d9-faf4-46ac-8d36-09652db0beac',
-                'Content-Type': 'application/json',
-              },
-            },
-          );
+        // subCategory ကိုယူပြီး အကြီးစာလုံးပြောင်းစစ်မယ် (ဥပမာ - "Outline" -> "OUTLINE")
+        const subCat = (product.subCategory || '').toUpperCase();
 
-          const userUuid = hiddifyRes.data.uuid;
-          subscriptionUrl = `https://net.notuse.xyz/MpLQ6YVffFqqn4pxPMrYz7cDe/${userUuid}`;
+        try {
+          // ၁။ OUTLINE API Logic (subCategory === 'OUTLINE')
+          if (subCat === 'OUTLINE') {
+            const outlineRes = await axios.post(
+              'https://check-remain-data.vercel.app/api/agent/create-key',
+              {
+                name: `${user.id}_${product.name}_${Date.now()}`,
+                limit_gb: product.usageLimitGB || 10,
+                amount: Number(product.price),
+              },
+              {
+                headers: {
+                  Authorization: 'Bearer ZLAadmin123',
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
+
+            if (outlineRes.data?.success) {
+              subscriptionUrl = outlineRes.data.accessUrl;
+            } else {
+              throw new Error('Outline API failed to generate key.');
+            }
+          }
+
+          // ၂။ HIDDIFY API Logic (subCategory === 'HIDDIFY')
+          else if (subCat === 'HIDDIFY') {
+            const hiddifyRes = await axios.post(
+              'https://net.notuse.xyz/eMTscaVR0wZgDa99t1Itsd/api/v2/admin/user/',
+              {
+                name: `${user.id}_${product.name}_${Date.now()}`,
+                usage_limit_GB: product.usageLimitGB || 1,
+                package_days: product.packageDays || 30,
+                mode: 'no_reset',
+                comment: `User: ${user.id} | Product: ${product.name}`,
+              },
+              {
+                headers: {
+                  'Hiddify-API-Key': '2b4b13d9-faf4-46ac-8d36-09652db0beac',
+                  'Content-Type': 'application/json',
+                },
+              },
+            );
+
+            const userUuid = hiddifyRes.data.uuid;
+            // Hostname နဲ့ Path ကို သင့်ရဲ့ မူလ API အတိုင်း ထားပေးထားပါတယ်
+            subscriptionUrl = `https://net.notuse.xyz/MpLQ6YVffFqqn4pxPMrYz7cDe/${userUuid}`;
+          }
+
+          // ၃။ အကယ်၍ subCategory က VPN ဖြစ်ပြီး Outline/Hiddify တစ်ခုမှ မဟုတ်လျှင်
+          else {
+            throw new BadRequestException(
+              `လက်ရှိမှာ ${product.subCategory} အတွက် API ချိတ်ဆက်ထားခြင်း မရှိသေးပါခင်ဗျာ။`,
+            );
+          }
         } catch (error: any) {
           console.error(
-            'Hiddify API Error:',
+            'VPN API Error:',
             error.response?.data || error.message,
           );
           throw new BadRequestException(
@@ -131,7 +170,7 @@ export class ProductsService {
           );
         }
 
-        // Price ရှိမှသာ Balance နှုတ်မယ်
+        // --- အောက်က Logic တွေကတော့ ပုံမှန်အတိုင်း ပိုက်ဆံနှုတ်ပြီး record သွင်းမှာပါ ---
         if (Number(product.price) > 0) {
           await tx.user.update({
             where: { id: userId },
