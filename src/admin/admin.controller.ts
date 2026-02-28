@@ -217,18 +217,21 @@ export class AdminController {
   @Get('products')
   async getAllProducts() {
     const products = await this.prisma.product.findMany({
+      // 👇 ဒီနေရာမှာ အစီအစဉ်စီရန် ထည့်လိုက်ပါသည်
+      orderBy: {
+        createdAt: 'desc', // 'desc' က နောက်ဆုံးတင်ထားတာကို အရင်ပြပါမယ်
+      },
       include: {
         _count: {
           select: {
             keys: {
-              where: { isUsed: false }, // Only count keys that haven't been sold
+              where: { isUsed: false },
             },
           },
         },
       },
     });
 
-    // We map the data so the frontend receives a simple 'stock' number
     return products.map((p) => ({
       ...p,
       stock: p._count.keys,
