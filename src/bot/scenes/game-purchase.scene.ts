@@ -27,10 +27,37 @@ export class GamePurchaseScene {
 
   @SceneEnter()
   async onEnter(@Ctx() ctx: BotContext) {
+    // --- မြန်မာစံတော်ချိန်ဖြင့် အချိန်စစ်ဆေးခြင်း ---
+    const mmTime = new Date(
+      new Date().toLocaleString('en-US', { timeZone: 'Asia/Yangon' }),
+    );
+    const currentHour = mmTime.getHours();
+
+    // မနက် 10:00 (10) မှ ည 9:00 (21) အတွင်းသာ ခွင့်ပြုမည်
+    if (currentHour < 10 || currentHour >= 21) {
+      await ctx.reply(
+        '🙏 <b>လူကြီးမင်းခင်ဗျာ...</b>\n\n' +
+          'ကျွန်တော်တို့ရဲ့ ဂိမ်းပစ္စည်း ဝယ်ယူခြင်း ဝန်ဆောင်မှုကို ' +
+          'လူကြီးမင်းတို့ စိတ်ကျေနပ်မှု အပြည့်အဝရရှိစေရန်အတွက် ' +
+          '<b>မနက် (10:00 AM) မှ ည (09:00 PM)</b> အတွင်းသာ ' +
+          'အကောင်းဆုံး ဝန်ဆောင်မှု ပေးလျက်ရှိပါသည်ခင်ဗျာ။ ✨\n\n' +
+          'ယခုအချိန်တွင် ခေတ္တပိတ်ထားပါသဖြင့် သတ်မှတ်ချိန်အတွင်း ' +
+          'ပြန်လည်လာရောက်အားပေးပါရန် လေးစားစွာဖြင့် မေတ္တာရပ်ခံအပ်ပါသည်။ 🙏',
+        {
+          parse_mode: 'HTML',
+          ...MAIN_KEYBOARD,
+        },
+      );
+      return ctx.scene.leave();
+    }
+    // ------------------------------------------
+
     const state = ctx.scene.state as GamePurchaseState;
 
     if (!state.productId) {
-      await ctx.reply('⚠️ Product အချက်အလက် မပြည့်စုံပါ။');
+      await ctx.reply(
+        '⚠️ စနစ်ချို့ယွင်းမှုကြောင့် Product အချက်အလက် မပြည့်စုံဖြစ်နေပါသည်။',
+      );
       return ctx.scene.leave();
     }
 
@@ -39,7 +66,9 @@ export class GamePurchaseScene {
     });
 
     if (!product) {
-      await ctx.reply('❌ ဤပစ္စည်းမှာ လက်ရှိ ဝယ်ယူ၍မရနိုင်တော့ပါ။');
+      await ctx.reply(
+        '❌ စိတ်မကောင်းပါဘူးခင်ဗျာ... ဤပစ္စည်းမှာ လက်ရှိ ဝယ်ယူ၍မရနိုင်တော့ပါ။',
+      );
       return ctx.scene.leave();
     }
 
@@ -48,7 +77,8 @@ export class GamePurchaseScene {
     await ctx.reply(
       `🎮 <b>${product.name}</b>\n` +
         `💰 ဈေးနှုန်း: <b>${product.price.toLocaleString()} MMK</b>\n\n` +
-        `ကျေးဇူးပြု၍ <b>Player ID (Game ID)</b> ကို ရိုက်ထည့်ပေးပါ -`,
+        `ကျေးဇူးပြု၍ လူကြီးမင်း၏ <b>Player ID (Game User ID)</b> ကို ရိုက်ထည့်ပေးပါခင်ဗျာ။\n\n` +
+        `<i>(မှတ်ချက် - Server ID ကို နောက်တစ်ဆင့်တွင် ထပ်မံမေးမြန်းပေးမည်ဖြစ်သောကြောင့် ယခုအဆင့်တွင် <b>Player ID တစ်ခုတည်းကိုသာ</b> အရင်ရိုက်ထည့်ပေးပါရန် မေတ္တာရပ်ခံအပ်ပါသည်။)</i>`,
       {
         parse_mode: 'HTML',
         ...Markup.keyboard([['🚫 မဝယ်တော့ပါ (Cancel)']]).resize(),
