@@ -741,6 +741,75 @@ export class BotUpdate {
   // 2. ADD THESE NEW ADMIN ACTIONS
   // ------------------------------------------
 
+  // ============================================================
+  // အပိုင်း (က) - Direct Pay (Screenshot) အတွက် သီးသန့် Logic
+  // (ဒီအပိုင်းမှာ ငွေပြန်အမ်းတဲ့ Refund logic လုံးဝမပါပါ)
+  // ============================================================
+
+  @Action(/^direct_done_(.+)$/)
+  async onDirectDone(@Ctx() ctx: BotContext) {
+    // @ts-ignore
+    const purchaseId = parseInt(ctx.match[1]);
+
+    try {
+      const purchase = await this.prisma.purchase.update({
+        where: { id: purchaseId },
+        data: { status: 'COMPLETED' },
+        include: { user: true, product: true },
+      });
+
+      // Admin Channel ထဲက စာသားကို Update လုပ်မယ် (Caption ကို သုံးရပါမယ်)
+      const caption = (ctx.callbackQuery.message as any).caption || '';
+      await ctx.editMessageCaption(
+        `${caption}\n\n✅ <b>COMPLETED (Direct) by ${ctx.from.first_name}</b>`,
+        { parse_mode: 'HTML' },
+      );
+
+      // User ဆီ အောင်မြင်ကြောင်း အကြောင်းကြားစာပို့မယ်
+      await ctx.telegram.sendMessage(
+        Number(purchase.user.telegramId),
+        `✅ <b>အော်ဒါ အောင်မြင်ပါသည်!</b>\n\nလူကြီးမင်း ဝယ်ယူထားသော <b>${purchase.product.name}</b> ကို အကောင့်ထဲသို့ ထည့်သွင်းပေးလိုက်ပါပြီ။\nအသုံးပြုပေးမှုအတွက် ကျေးဇူးတင်ပါသည်! 🙏`,
+        { parse_mode: 'HTML' },
+      );
+
+      await ctx.answerCbQuery('Done!');
+    } catch (e) {
+      await ctx.answerCbQuery('Error updating order');
+    }
+  }
+
+  @Action(/^direct_reject_(.+)$/)
+  async onDirectReject(@Ctx() ctx: BotContext) {
+    // @ts-ignore
+    const purchaseId = parseInt(ctx.match[1]);
+
+    try {
+      const purchase = await this.prisma.purchase.update({
+        where: { id: purchaseId },
+        data: { status: 'REJECTED' },
+        include: { user: true },
+      });
+
+      // Admin Message ကို Reject ပြောင်းမယ်
+      const caption = (ctx.callbackQuery.message as any).caption || '';
+      await ctx.editMessageCaption(
+        `${caption}\n\n❌ <b>REJECTED (Direct) by ${ctx.from.first_name}</b>`,
+        { parse_mode: 'HTML' },
+      );
+
+      // User ဆီ ငြင်းပယ်ကြောင်း ပို့မယ် (Refund စာသား မပါပါ)
+      await ctx.telegram.sendMessage(
+        Number(purchase.user.telegramId),
+        `❌ <b>အော်ဒါကို ငြင်းပယ်လိုက်ပါသည်</b>\n\nလူကြီးမင်း ပေးပို့ထားသော ငွေလွှဲပြေစာ (Screenshot) သို့မဟုတ် အချက်အလက်များ မှားယွင်းနေသဖြင့် Admin မှ ပယ်ဖျက်လိုက်ပါသည်။\nကျေးဇူးပြု၍ Admin ကို ပြန်လည်ဆက်သွယ်ပေးပါ။`,
+        { parse_mode: 'HTML' },
+      );
+
+      await ctx.answerCbQuery('Rejected');
+    } catch (e) {
+      await ctx.answerCbQuery('Error rejecting');
+    }
+  }
+
   @Action(/^order_done_(.+)$/)
   async onOrderDone(@Ctx() ctx: BotContext) {
     // @ts-ignore

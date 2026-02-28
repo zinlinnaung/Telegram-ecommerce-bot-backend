@@ -227,8 +227,14 @@ export class GamePurchaseScene {
         caption: adminMsg,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          [Markup.button.callback('✅ Done', `order_done_${purchase.id}`)],
-          [Markup.button.callback('❌ Reject', `order_reject_${purchase.id}`)],
+          Markup.button.callback(
+            '✅ Done (Direct)',
+            `direct_done_${purchase.id}`,
+          ),
+          Markup.button.callback(
+            '❌ Reject (Direct)',
+            `direct_reject_${purchase.id}`,
+          ),
         ]),
       });
 
