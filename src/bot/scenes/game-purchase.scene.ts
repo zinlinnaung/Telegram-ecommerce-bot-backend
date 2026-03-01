@@ -274,8 +274,8 @@ export class GamePurchaseScene {
         `🔢 အရေအတွက်: <b>${qty}</b>\n` +
         `💰 စုစုပေါင်း: <b>${totalPrice.toLocaleString()} MMK</b>\n` +
         `🎮 Nick: <b>${state.nickname || 'N/A'}</b>\n` +
-        `🆔 ID: <code>${state.playerId}</code>\n` +
-        `🌏 Server: <code>${state.serverId}</code>\n` +
+        `🆔 ID: <code>${state.playerId} (${state.serverId})</code>\n` +
+        // `🌏 Server: <code>${state.serverId}</code>\n` +
         `👤 User: <a href="tg://user?id=${user.telegramId}">${user.firstName}</a>`;
 
       await ctx.telegram.sendPhoto(process.env.ADMIN_CHANNEL_ID, fileId, {
