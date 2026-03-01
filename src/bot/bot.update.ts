@@ -105,15 +105,18 @@ export class BotUpdate {
 
     // ၁။ Bonus မယူရသေးသူများကို အရင်စစ်မယ်
     if (!user.welcomeBonusClaimed) {
+      const firstwelcomeText = `👋 <b>Welcome ${user.firstName}!</b>\n\n`;
       const welcomeText =
-        `👋 <b>Welcome ${user.firstName}!</b>\n\n` +
         `🎁 လူကြီးမင်းအတွက် အထူးလက်ဆောင်ရှိပါတယ်!\n` +
         `ကျွန်ုပ်တို့၏ Channel ကို Join ထားရုံဖြင့် <b>${this.BONUS_AMOUNT} MMK</b> ကို Bonus အဖြစ် အခမဲ့ ရယူနိုင်ပါတယ်။\n\n` +
         `အောက်ပါ Channel ကို Join ပြီးနောက် "Bonus ယူမည်" ခလုတ်ကို နှိပ်ပေးပါခင်ဗျာ။`;
 
-      await ctx.reply(welcomeText, {
+      await ctx.reply(firstwelcomeText, {
         parse_mode: 'HTML',
         ...MAIN_KEYBOARD,
+      });
+      await ctx.reply(welcomeText, {
+        parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
           [
             Markup.button.url(
