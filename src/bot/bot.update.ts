@@ -113,6 +113,7 @@ export class BotUpdate {
 
       await ctx.reply(welcomeText, {
         parse_mode: 'HTML',
+        ...MAIN_KEYBOARD,
         ...Markup.inlineKeyboard([
           [
             Markup.button.url(
