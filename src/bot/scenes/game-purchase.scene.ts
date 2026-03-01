@@ -18,9 +18,9 @@ interface GamePurchaseState {
   playerId?: string;
   serverId?: string;
   nickname?: string;
-  quantity?: number; // တိုးလိုက်တာ
-  waitingForQuantity?: boolean; // တိုးလိုက်တာ
-  waitingForPhoto?: boolean; // New flag to track step
+  quantity?: number;
+  waitingForQuantity?: boolean;
+  waitingForPhoto?: boolean;
 }
 
 @Scene('game_purchase_scene')
@@ -35,16 +35,13 @@ export class GamePurchaseScene {
     );
     const currentHour = mmTime.getHours();
 
-    // မနက် 10:00 (10) မှ ည 9:00 (21) အတွင်းသာ ခွင့်ပြုမည်
+    // မနက် 10:00 မှ ည 12:00 အတွင်းသာ ခွင့်ပြုမည်
     if (currentHour < 10 || currentHour >= 24) {
       await ctx.reply(
         '🙏 <b>လူကြီးမင်းခင်ဗျာ...</b>\n\n' +
-          'ကျွန်တော်တို့ရဲ့ ဂိမ်းပစ္စည်း ဝယ်ယူခြင်း ဝန်ဆောင်မှုကို ' +
-          'လူကြီးမင်းတို့ စိတ်ကျေနပ်မှု အပြည့်အဝရရှိစေရန်အတွက် ' +
-          '<b>မနက် (10:00 AM) မှ ည (09:00 PM)</b> အတွင်းသာ ' +
+          'ကျွန်တော်တို့၏ ဝန်ဆောင်မှုကို <b>မနက် (10:00 AM) မှ ည (12:00 AM)</b> အတွင်းသာ ' +
           'အကောင်းဆုံး ဝန်ဆောင်မှု ပေးလျက်ရှိပါသည်ခင်ဗျာ။\n\n' +
-          'ယခုအချိန်တွင် ခေတ္တပိတ်ထားပါသဖြင့် သတ်မှတ်ချိန်အတွင်း ' +
-          'ပြန်လည်လာရောက်အားပေးပါရန် လေးစားစွာဖြင့် မေတ္တာရပ်ခံအပ်ပါသည်။ 🙏',
+          'ယခုအချိန်တွင် ခေတ္တပိတ်ထားပါသဖြင့် သတ်မှတ်ချိန်အတွင်း ပြန်လာခဲ့ပါရန် မေတ္တာရပ်ခံအပ်ပါသည်။ 🙏',
         {
           parse_mode: 'HTML',
           ...MAIN_KEYBOARD,
@@ -52,13 +49,12 @@ export class GamePurchaseScene {
       );
       return ctx.scene.leave();
     }
-    // ------------------------------------------
 
     const state = ctx.scene.state as GamePurchaseState;
 
     if (!state.productId) {
       await ctx.reply(
-        '⚠️ စနစ်ချို့ယွင်းမှုကြောင့် Product အချက်အလက် မပြည့်စုံဖြစ်နေပါသည်။',
+        '⚠️ စနစ်ချို့ယွင်းမှုကြောင့် Product အချက်အလက် မပြည့်စုံပါ။',
       );
       return ctx.scene.leave();
     }
@@ -68,9 +64,7 @@ export class GamePurchaseScene {
     });
 
     if (!product) {
-      await ctx.reply(
-        '❌ စိတ်မကောင်းပါဘူးခင်ဗျာ... ဤပစ္စည်းမှာ လက်ရှိ ဝယ်ယူ၍မရနိုင်တော့ပါ။',
-      );
+      await ctx.reply('❌ ဤပစ္စည်းမှာ လက်ရှိ ဝယ်ယူ၍မရနိုင်တော့ပါ။');
       return ctx.scene.leave();
     }
 
@@ -79,16 +73,13 @@ export class GamePurchaseScene {
     await ctx.reply(
       `🎮 <b>${product.name}</b>\n` +
         `💰 ဈေးနှုန်း: <b>${product.price.toLocaleString()} MMK</b>\n\n` +
-        `ကျေးဇူးပြု၍ လူကြီးမင်း၏ <b>Player ID (Game User ID)</b> ကို ရိုက်ထည့်ပေးပါခင်ဗျာ။\n\n` +
-        `<i>(မှတ်ချက် - Server ID ကို နောက်တစ်ဆင့်တွင် ထပ်မံမေးမြန်းပေးမည်ဖြစ်သောကြောင့် ယခုအဆင့်တွင် <b>Player ID တစ်ခုတည်းကိုသာ</b> အရင်ရိုက်ထည့်ပေးပါရန် မေတ္တာရပ်ခံအပ်ပါသည်။)</i>`,
+        `ကျေးဇူးပြု၍ လူကြီးမင်း၏ <b>Player ID (Game User ID)</b> ကို ရိုက်ထည့်ပေးပါခင်ဗျာ။`,
       {
         parse_mode: 'HTML',
         ...Markup.keyboard([['🚫 မဝယ်တော့ပါ (Cancel)']]).resize(),
       },
     );
   }
-
-  // ... (Imports and Constructor)
 
   @On('message')
   async onMessage(@Ctx() ctx: BotContext) {
@@ -101,19 +92,19 @@ export class GamePurchaseScene {
       return ctx.scene.leave();
     }
 
-    // အဆင့် (၄) - Photo လက်ခံခြင်း
+    // ၁။ Photo လက်ခံခြင်း (Step 4)
     if (state.waitingForPhoto) {
       if (!msg.photo)
         return ctx.reply('⚠️ ကျေးဇူးပြု၍ ငွေလွှဲပြေစာ ပုံပို့ပေးပါ။');
       return this.handlePhotoUpload(ctx, msg.photo);
     }
 
-    // အဆင့် (၃) - အရေအတွက် လက်ခံခြင်း
+    // ၂။ အရေအတွက် လက်ခံခြင်း (Step 3)
     if (state.waitingForQuantity) {
       const qty = parseInt(text);
       if (isNaN(qty) || qty <= 0) {
         return ctx.reply(
-          '⚠️ ကျေးဇူးပြု၍ အရေအတွက်ကို ဂဏန်းဖြင့် မှန်ကန်စွာ ရိုက်ထည့်ပေးပါ။ (ဥပမာ - 1, 5, 10)',
+          '⚠️ ကျေးဇူးပြု၍ အရေအတွက်ကို ဂဏန်းဖြင့် မှန်ကန်စွာ ရိုက်ထည့်ပေးပါ။',
         );
       }
       state.quantity = qty;
@@ -121,7 +112,7 @@ export class GamePurchaseScene {
       return this.askForPayment(ctx);
     }
 
-    // အဆင့် (၁) - Player ID လက်ခံခြင်း
+    // ၃။ Player ID လက်ခံခြင်း (Step 1)
     if (!state.playerId) {
       state.playerId = text;
       const isMLBB =
@@ -130,59 +121,20 @@ export class GamePurchaseScene {
 
       if (isMLBB) {
         await ctx.reply(
-          '✅ Player ID ရပါပြီ။\n\nကျေးဇူးပြု၍ **Server ID** ကို ဆက်လက်ရိုက်ထည့်ပေးပါ -',
+          '✅ Player ID ရပါပြီ။\n\nကျေးဇူးပြု၍ <b>Server ID</b> ကို ဆက်လက်ရိုက်ထည့်ပေးပါ -',
         );
         return;
       } else {
         state.serverId = 'N/A';
-        return this.askForQuantity(ctx); // MLBB မဟုတ်ရင် အရေအတွက် တန်းမေးမယ်
+        return this.askForQuantity(ctx); // MLBB မဟုတ်လျှင် အရေအတွက် တန်းမေးမယ်
       }
     }
 
-    // အဆင့် (၂) - Server ID လက်ခံခြင်း (MLBB သီးသန့်)
+    // ၄။ Server ID လက်ခံခြင်း (Step 2 - MLBB Only)
     if (!state.serverId) {
       state.serverId = text;
       return this.validateMLBB(ctx, state);
     }
-  }
-
-  // အရေအတွက် မေးရန် Function
-  async askForQuantity(ctx: BotContext) {
-    const state = ctx.scene.state as GamePurchaseState;
-    state.waitingForQuantity = true;
-    await ctx.reply(
-      `🔢 ဝယ်ယူမည့် **အရေအတွက် (Quantity)** ကို ရိုက်ထည့်ပေးပါခင်ဗျာ -`,
-      Markup.keyboard([
-        ['1', '2', '3'],
-        ['5', '10', '🚫 မဝယ်တော့ပါ (Cancel)'],
-      ]).resize(),
-    );
-  }
-
-  // Payment အဆင့်မှာ Total Price တွက်ပြခြင်း
-  async askForPayment(ctx: BotContext) {
-    const state = ctx.scene.state as GamePurchaseState;
-    state.waitingForPhoto = true;
-
-    const unitPrice = Number(state.product.price);
-    const qty = state.quantity || 1;
-    const totalPrice = unitPrice * qty;
-
-    const paymentInfo =
-      `🏦 **ငွေပေးချေရန် အချက်အလက်များ**\n` +
-      `➖➖➖➖➖➖➖➖➖➖\n` +
-      `📦 ပစ္စည်း: **${state.product.name}**\n` +
-      `🔢 အရေအတွက်: **${qty}**\n` +
-      `💰 စုစုပေါင်းကျသင့်ငွေ: **${totalPrice.toLocaleString()} MMK**\n` + // စုစုပေါင်းတွက်ပြတာ
-      `➖➖➖➖➖➖➖➖➖➖\n` +
-      `💎 **KBZ Pay / Wave** : \`09447032756\`\n` +
-      `👤 Name: **Zin Linn Aung**\n\n` +
-      `အထက်ပါအကောင့်သို့ ငွေလွှဲပြီးပါက **ငွေလွှဲပြေစာ (Screenshot)** ကို ပေးပို့ပေးပါခင်ဗျာ။`;
-
-    await ctx.reply(paymentInfo, {
-      parse_mode: 'MarkdownV2', // 09... ကို နှိပ်ရင် Copy ကူးရလွယ်အောင် code block သုံးထားလို့ပါ
-      ...Markup.keyboard([['🚫 မဝယ်တော့ပါ (Cancel)']]).resize(),
-    });
   }
 
   async validateMLBB(ctx: BotContext, state: GamePurchaseState) {
@@ -209,7 +161,7 @@ export class GamePurchaseScene {
             ...Markup.inlineKeyboard([
               [
                 Markup.button.callback(
-                  '✅ မှန်ကန်သည်၊ ဝယ်မည်',
+                  '✅ မှန်ကန်သည်၊ ဆက်သွားမည်',
                   'confirm_game_buy',
                 ),
               ],
@@ -246,64 +198,81 @@ export class GamePurchaseScene {
   async onConfirm(@Ctx() ctx: BotContext) {
     await ctx.answerCbQuery();
     await ctx.deleteMessage().catch(() => {});
-    return this.askForPayment(ctx);
+    return this.askForQuantity(ctx); // Verification ပြီးရင် အရေအတွက် အရင်မေးမယ်
   }
 
-  // async askForPayment(ctx: BotContext) {
-  //   const state = ctx.scene.state as GamePurchaseState;
-  //   state.waitingForPhoto = true;
+  async askForQuantity(ctx: BotContext) {
+    const state = ctx.scene.state as GamePurchaseState;
+    state.waitingForQuantity = true;
+    await ctx.reply(
+      `🔢 ဝယ်ယူမည့် <b>အရေအတွက် (Quantity)</b> ကို ရိုက်ထည့်ပေးပါခင်ဗျာ -`,
+      {
+        parse_mode: 'HTML',
+        ...Markup.keyboard([
+          ['1', '2', '3'],
+          ['5', '10', '🚫 မဝယ်တော့ပါ (Cancel)'],
+        ]).resize(),
+      },
+    );
+  }
 
-  //   const paymentInfo =
-  //     `🏦 <b>ငွေပေးချေရန် အချက်အလက်များ</b>\n` +
-  //     `➖➖➖➖➖➖➖➖➖➖\n` +
-  //     `💎 <b>KBZ Pay / Wave</b> : <code>09447032756</code>\n` +
-  //     `👤 Name: <b>Zin Linn Aung</b>\n` +
-  //     `💰 ကျသင့်ငွေ: <b>${state.product.price.toLocaleString()} MMK</b>\n` +
-  //     `➖➖➖➖➖➖➖➖➖➖\n\n` +
-  //     `အထက်ပါအကောင့်သို့ ငွေလွှဲပြီးပါက <b>ငွေလွှဲပြေစာ (Screenshot)</b> ကို ပေးပို့ပေးပါခင်ဗျာ။`;
+  async askForPayment(ctx: BotContext) {
+    const state = ctx.scene.state as GamePurchaseState;
+    state.waitingForPhoto = true;
 
-  //   await ctx.reply(paymentInfo, {
-  //     parse_mode: 'HTML',
-  //     ...Markup.keyboard([['🚫 မဝယ်တော့ပါ (Cancel)']]).resize(),
-  //   });
-  // }
+    const unitPrice = Number(state.product.price);
+    const qty = state.quantity || 1;
+    const totalPrice = unitPrice * qty;
+
+    const paymentInfo =
+      `🏦 <b>ငွေပေးချေရန် အချက်အလက်များ</b>\n` +
+      `----------------------------------\n` +
+      `📦 ပစ္စည်း: <b>${state.product.name}</b>\n` +
+      `🔢 အရေအတွက်: <b>${qty}</b>\n` +
+      `💰 စုစုပေါင်းကျသင့်ငွေ: <b>${totalPrice.toLocaleString()} MMK</b>\n` +
+      `----------------------------------\n\n` +
+      `💎 <b>KBZ Pay / Wave</b> : <code>09447032756</code>\n` +
+      `👤 Name: <b>Zin Linn Aung</b>\n\n` +
+      `အထက်ပါအကောင့်သို့ ငွေလွှဲပြီးပါက <b>ငွေလွှဲပြေစာ (Screenshot)</b> ကို ပေးပို့ပေးပါခင်ဗျာ။`;
+
+    await ctx.reply(paymentInfo, {
+      parse_mode: 'HTML', // MarkdownV2 အစား HTML သုံးခြင်းဖြင့် Error ကို ဖြေရှင်းသည်
+      ...Markup.keyboard([['🚫 မဝယ်တော့ပါ (Cancel)']]).resize(),
+    });
+  }
 
   async handlePhotoUpload(ctx: BotContext, photoArray: any[]) {
     const state = ctx.scene.state as GamePurchaseState;
-
-    // const state = ctx.scene.state as GamePurchaseState;
-    const totalPrice = Number(state.product.price) * (state.quantity || 1);
+    const qty = state.quantity || 1;
+    const totalPrice = Number(state.product.price) * qty;
     const loading = await ctx.reply('⏳ အော်ဒါတင်နေပါသည်...');
 
     try {
       const photo = photoArray[photoArray.length - 1];
       const fileId = photo.file_id;
+
       const user = await this.prisma.user.findUnique({
         where: { telegramId: BigInt(ctx.from.id) },
       });
 
-      // Create Purchase Record (Status: PENDING)
       const purchase = await this.prisma.purchase.create({
         data: {
           userId: user.id,
           productId: state.product.id,
-          quantity: state.quantity || 1, // field အသစ်
-          amount: totalPrice, // စုစုပေါင်းဈေးနှုန်း
-          // amount: state.product.price,
+          quantity: qty,
+          amount: totalPrice,
           playerId: state.playerId,
           serverId: state.serverId,
           nickname: state.nickname || 'N/A',
           status: 'PENDING',
-          // If your schema has a field for screenshot, save fileId here
-          // screenshot: fileId
         },
       });
 
-      // Notify Admin with Photo and Buttons
       const adminMsg =
         `🛒 <b>Order အသစ် (Direct Pay)</b>\n\n` +
-        `📦 ပစ္စည်း: ${state.product.name}\n` +
-        `💰 ဈေးနှုန်း: ${state.product.price.toLocaleString()} MMK\n` +
+        `📦 ပစ္စည်း: <b>${state.product.name}</b>\n` +
+        `🔢 အရေအတွက်: <b>${qty}</b>\n` +
+        `💰 စုစုပေါင်း: <b>${totalPrice.toLocaleString()} MMK</b>\n` +
         `🎮 Nick: <b>${state.nickname || 'N/A'}</b>\n` +
         `🆔 ID: <code>${state.playerId}</code>\n` +
         `🌏 Server: <code>${state.serverId}</code>\n` +
@@ -313,14 +282,16 @@ export class GamePurchaseScene {
         caption: adminMsg,
         parse_mode: 'HTML',
         ...Markup.inlineKeyboard([
-          Markup.button.callback(
-            '✅ Done (Direct)',
-            `direct_done_${purchase.id}`,
-          ),
-          Markup.button.callback(
-            '❌ Reject (Direct)',
-            `direct_reject_${purchase.id}`,
-          ),
+          [
+            Markup.button.callback(
+              '✅ Done (Direct)',
+              `direct_done_${purchase.id}`,
+            ),
+            Markup.button.callback(
+              '❌ Reject (Direct)',
+              `direct_reject_${purchase.id}`,
+            ),
+          ],
         ]),
       });
 
@@ -346,9 +317,7 @@ export class GamePurchaseScene {
     state.playerId = undefined;
     state.serverId = undefined;
     await ctx.answerCbQuery();
-    await ctx.reply('🔄 ကျေးဇူးပြု၍ <b>Player ID</b> ပြန်ရိုက်ပေးပါ -', {
-      parse_mode: 'HTML',
-    });
+    await ctx.reply('🔄 ကျေးဇူးပြု၍ <b>Player ID</b> ပြန်ရိုက်ပေးပါ -');
   }
 
   @Action('cancel_action')
