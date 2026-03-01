@@ -762,22 +762,33 @@ export class BotUpdate {
         include: { user: true, product: true },
       });
 
-      // Admin Channel ထဲက စာသားကို Update လုပ်မယ် (Caption ကို သုံးရပါမယ်)
+      // Admin Message Update - Inline Buttons ကို ဖျောက်ပြီး Status ပြောင်းမယ်
       const caption = (ctx.callbackQuery.message as any).caption || '';
       await ctx.editMessageCaption(
-        `${caption}\n\n✅ <b>COMPLETED (Direct) by ${ctx.from.first_name}</b>`,
-        { parse_mode: 'HTML' },
+        `${caption}\n\n✅ <b>COMPLETED BY ${ctx.from.first_name.toUpperCase()}</b>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [] }, // Button တွေကို ဖျက်လိုက်တာ
+        },
       );
 
-      // User ဆီ အောင်မြင်ကြောင်း အကြောင်းကြားစာပို့မယ်
+      // User ဆီကို အရေအတွက်ပါဝင်တဲ့ အကြောင်းကြားစာပို့မယ်
+      const userMsg =
+        `✅ <b>အော်ဒါ အောင်မြင်ပါသည်!</b>\n\n` +
+        `📦 ပစ္စည်း: <b>${purchase.product.name}</b>\n` +
+        `🔢 အရေအတွက်: <b>${purchase.quantity}</b>\n` + // Quantity ထည့်သွင်းခြင်း
+        `💰 စုစုပေါင်းကျသင့်ငွေ: <b>${purchase.amount.toLocaleString()} MMK</b>\n\n` +
+        `လူကြီးမင်း၏ အကောင့်ထဲသို့ ပစ္စည်းများ ထည့်သွင်းပေးလိုက်ပါပြီ။\nကျေးဇူးတင်ပါသည်! 🙏`;
+
       await ctx.telegram.sendMessage(
         Number(purchase.user.telegramId),
-        `✅ <b>အော်ဒါ အောင်မြင်ပါသည်!</b>\n\nလူကြီးမင်း ဝယ်ယူထားသော <b>${purchase.product.name}</b> ကို အကောင့်ထဲသို့ ထည့်သွင်းပေးလိုက်ပါပြီ။\nအသုံးပြုပေးမှုအတွက် ကျေးဇူးတင်ပါသည်! 🙏`,
+        userMsg,
         { parse_mode: 'HTML' },
       );
 
-      await ctx.answerCbQuery('Done!');
+      await ctx.answerCbQuery('Order Completed!');
     } catch (e) {
+      console.error(e);
       await ctx.answerCbQuery('Error updating order');
     }
   }
@@ -791,26 +802,36 @@ export class BotUpdate {
       const purchase = await this.prisma.purchase.update({
         where: { id: purchaseId },
         data: { status: 'REJECTED' },
-        include: { user: true },
+        include: { user: true, product: true },
       });
 
-      // Admin Message ကို Reject ပြောင်းမယ်
+      // Admin Message Update
       const caption = (ctx.callbackQuery.message as any).caption || '';
       await ctx.editMessageCaption(
-        `${caption}\n\n❌ <b>REJECTED (Direct) by ${ctx.from.first_name}</b>`,
-        { parse_mode: 'HTML' },
+        `${caption}\n\n❌ <b>REJECTED BY ${ctx.from.first_name.toUpperCase()}</b>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [] }, // Button တွေကို ဖျက်လိုက်တာ
+        },
       );
 
-      // User ဆီ ငြင်းပယ်ကြောင်း ပို့မယ် (Refund စာသား မပါပါ)
+      // User ဆီ ငြင်းပယ်ကြောင်း ပို့မယ်
+      const rejectMsg =
+        `❌ <b>အော်ဒါကို ငြင်းပယ်လိုက်ပါသည်</b>\n\n` +
+        `📦 ပစ္စည်း: ${purchase.product.name} (${purchase.quantity} ခု)\n\n` +
+        `လူကြီးမင်း ပေးပို့ထားသော ငွေလွှဲပြေစာ သို့မဟုတ် အချက်အလက်များ မှားယွင်းနေသဖြင့် Admin မှ ပယ်ဖျက်လိုက်ပါသည်။\n` +
+        `အဆင်မပြေမှုရှိပါက Admin ကို ပြန်လည်ဆက်သွယ်ပေးပါ။`;
+
       await ctx.telegram.sendMessage(
         Number(purchase.user.telegramId),
-        `❌ <b>အော်ဒါကို ငြင်းပယ်လိုက်ပါသည်</b>\n\nလူကြီးမင်း ပေးပို့ထားသော ငွေလွှဲပြေစာ (Screenshot) သို့မဟုတ် အချက်အလက်များ မှားယွင်းနေသဖြင့် Admin မှ ပယ်ဖျက်လိုက်ပါသည်။\nကျေးဇူးပြု၍ Admin ကို ပြန်လည်ဆက်သွယ်ပေးပါ။`,
+        rejectMsg,
         { parse_mode: 'HTML' },
       );
 
-      await ctx.answerCbQuery('Rejected');
+      await ctx.answerCbQuery('Order Rejected');
     } catch (e) {
-      await ctx.answerCbQuery('Error rejecting');
+      console.error(e);
+      await ctx.answerCbQuery('Error rejecting order');
     }
   }
 

@@ -103,6 +103,7 @@ model Purchase {
   id        Int     @id @default(autoincrement())
   userId    Int
   productId Int
+  quantity  Int     @default(1) // <--- ဒီလိုင်းအသစ် ထည့်ပါ
   amount    Decimal @db.Decimal(10, 2)
 
   // New Fields for Games
